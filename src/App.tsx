@@ -1,133 +1,126 @@
 /**
- * BachatPay — USDC Shop Payments on Arc
- * Pay shopkeepers with USDC via QR code. Bridge from any chain automatically.
+ * BachatPay — Daily USDC payments on Arc. Like GPay, but onchain.
  * Built with Arc Studio — https://studio.arc.io
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { ConnectKitButton } from 'connectkit'
 import {
-  useAccount,
-  useReadContract,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-  useSwitchChain,
+  useAccount, useChainId, useSwitchChain,
+  useReadContract, useWriteContract, useWaitForTransactionReceipt,
   useConnectorClient,
-  useChainId,
 } from 'wagmi'
 import { erc20Abi, parseUnits, formatUnits, isAddress } from 'viem'
-import { arc, base, arbitrum, optimism, polygon, mainnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 import { toast } from 'sonner'
 import {
-  QrCode, Send, ArrowLeftRight, Clock, ExternalLink,
-  CheckCircle2, Loader2, Copy, ShoppingBag, Zap, ChevronRight,
-  ArrowDown,
+  Send, QrCode, History, ArrowDownLeft, Star, StarOff,
+  Copy, Share2, ExternalLink, Loader2, CheckCircle2, ScanLine,
+  Users, ChevronRight, Zap, X, Wallet,
 } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { QRCodeSVG } from 'qrcode.react'
+import { Html5Qrcode } from 'html5-qrcode'
+import { buildShareLink } from './lib/share'
 import { AppKit } from '@circle-fin/app-kit'
 import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2'
-import type { EIP1193Provider, Chain } from 'viem'
-import { buildShareLink } from './lib/share'
+import type { EIP1193Provider } from 'viem'
+import { base, arbitrum, optimism, polygon } from 'viem/chains'
+import type { Chain } from 'viem'
 
-// ── Arc Mainnet constants ──────────────────────────────────────────────────────
-const ARC_CHAIN_ID = 5042
+// ── Constants ─────────────────────────────────────────────────────────────────
+const ARC_CHAIN_ID = arc.id // 5042
 const USDC_ADDRESS = '0x3600000000000000000000000000000000000000' as const
 const USDC_DECIMALS = 6
 const EXPLORER = 'https://explorer.arc.io'
 
-// Circle App Kit for bridging
-const appKit = new AppKit()
-
-// Supported source chains for bridge
-const BRIDGE_CHAINS: Array<{ chain: Chain; kitName: string; label: string }> = [
-  { chain: base, kitName: 'Base', label: 'Base' },
-  { chain: arbitrum, kitName: 'Arbitrum', label: 'Arbitrum' },
-  { chain: optimism, kitName: 'Optimism', label: 'Optimism' },
-  { chain: polygon, kitName: 'Polygon', label: 'Polygon' },
-  { chain: mainnet, kitName: 'Ethereum', label: 'Ethereum' },
-]
-
-// Glass tokens
 const glass = {
   card: {
-    background: 'rgba(255,255,255,0.64)',
+    background: 'rgba(255,255,255,0.72)',
     backdropFilter: 'blur(24px) saturate(180%)',
     WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-    border: '1px solid rgba(255,255,255,0.68)',
+    border: '1px solid rgba(255,255,255,0.72)',
     boxShadow: '0 8px 32px rgba(18,45,69,0.08), inset 0 1px 0 rgba(255,255,255,0.55)',
-    borderRadius: '20px',
   } as React.CSSProperties,
   inner: {
-    background: 'rgba(255,255,255,0.46)',
-    border: '1px solid rgba(255,255,255,0.56)',
-    borderRadius: '12px',
+    background: 'rgba(255,255,255,0.50)',
+    border: '1px solid rgba(255,255,255,0.60)',
   } as React.CSSProperties,
 }
 
-const spectral = 'linear-gradient(90deg, #5fbeff, #af8ff4, #f05c6b, #ffcd83, #7ef1b3)'
+const QUICK_AMOUNTS = ['1', '5', '10', '20', '50']
 
-// withAddChainFallback — allows adding unknown destination chains to wallet
-const isUnrecognizedChain = (error: unknown) => {
-  const e = error as { code?: number; data?: { originalError?: { code?: number } } }
-  return e?.code === 4902 || e?.data?.originalError?.code === 4902
-}
+type Tab = 'home' | 'pay' | 'receive' | 'history'
 
-function withAddChainFallback(provider: EIP1193Provider, chains: readonly Chain[]): EIP1193Provider {
-  const send = provider.request.bind(provider) as (args: { method: string; params?: unknown }) => Promise<unknown>
-  const request = (async (args: { method: string; params?: unknown }) => {
-    try {
-      return await send(args)
-    } catch (error) {
-      if (args.method !== 'wallet_switchEthereumChain' || !isUnrecognizedChain(error)) throw error
-      const [{ chainId }] = args.params as [{ chainId: string }]
-      const chain = chains.find((c) => c.id === Number(chainId))
-      if (!chain) throw error
-      await send({
-        method: 'wallet_addEthereumChain',
-        params: [{
-          chainId: `0x${chain.id.toString(16)}`,
-          chainName: chain.name,
-          nativeCurrency: chain.nativeCurrency,
-          rpcUrls: [...chain.rpcUrls.default.http],
-          blockExplorerUrls: chain.blockExplorers ? [chain.blockExplorers.default.url] : undefined,
-        }],
-      })
-      return send(args)
-    }
-  }) as EIP1193Provider['request']
-
-  return new Proxy(provider, {
-    get(target, prop) {
-      if (prop === 'request') return request
-      const value = Reflect.get(target, prop, target)
-      return typeof value === 'function' ? value.bind(target) : value
-    },
-  })
-}
-
-// Payment history entry
 interface HistoryEntry {
   hash: string
   to: string
   amount: string
   note: string
   ts: number
+  dir: 'out' | 'in'
 }
 
-// ── Main App ──────────────────────────────────────────────────────────────────
+interface Favourite {
+  address: string
+  name: string
+}
+
+// ── Bridge helpers ─────────────────────────────────────────────────────────────
+const appKit = new AppKit()
+
+interface BridgeChain { label: string; chain: Chain; kitName: string }
+const BRIDGE_CHAINS: BridgeChain[] = [
+  { label: 'Base', chain: base, kitName: 'Base' },
+  { label: 'Arbitrum', chain: arbitrum, kitName: 'Arbitrum' },
+  { label: 'Optimism', chain: optimism, kitName: 'OP Mainnet' },
+  { label: 'Polygon', chain: polygon, kitName: 'Polygon' },
+]
+
+function withAddChainFallback(provider: EIP1193Provider, chains: Chain[]): EIP1193Provider {
+  const send = provider.request.bind(provider) as (args: { method: string; params?: unknown }) => Promise<unknown>
+  const request = (async (args: { method: string; params?: unknown }) => {
+    try { return await send(args) }
+    catch (error) {
+      const e = error as { code?: number }
+      if (args.method !== 'wallet_switchEthereumChain' || e?.code !== 4902) throw error
+      const [{ chainId }] = args.params as [{ chainId: string }]
+      const ch = chains.find(c => c.id === Number(chainId))
+      if (!ch) throw error
+      await send({ method: 'wallet_addEthereumChain', params: [{ chainId, chainName: ch.name, nativeCurrency: ch.nativeCurrency, rpcUrls: [...ch.rpcUrls.default.http] }] })
+      return send(args)
+    }
+  }) as EIP1193Provider['request']
+  return new Proxy(provider, { get(t, p) { return p === 'request' ? request : typeof Reflect.get(t, p, t) === 'function' ? (Reflect.get(t, p, t) as CallableFunction).bind(t) : Reflect.get(t, p, t) } })
+}
+
+// ── Local storage helpers ──────────────────────────────────────────────────────
+function loadHistory(): HistoryEntry[] {
+  try { return JSON.parse(localStorage.getItem('bachat_history') ?? '[]') as HistoryEntry[] } catch { return [] }
+}
+function loadFavourites(): Favourite[] {
+  try { return JSON.parse(localStorage.getItem('bachat_favs') ?? '[]') as Favourite[] } catch { return [] }
+}
+
+function shortAddr(addr: string) {
+  return addr.slice(0, 6) + '…' + addr.slice(-4)
+}
+function fmtDate(ts: number) {
+  return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
 export default function App() {
   const { address, isConnected } = useAccount()
   const chainId = useChainId()
   const { switchChainAsync } = useSwitchChain()
   const { data: connectorClient } = useConnectorClient()
-
-  const [tab, setTab] = useState<'pay' | 'receive' | 'bridge' | 'history'>(() => {
+  const [tab, setTab] = useState<Tab>(() => {
     const p = new URLSearchParams(window.location.search)
-    return p.get('to') ? 'pay' : 'pay'
+    return p.get('to') ? 'pay' : 'home'
   })
 
-  // ── USDC balance on Arc ────────────────────────────────────────────────────
+  // ── USDC balance ──────────────────────────────────────────────────────────
   const { data: usdcBalance, refetch: refetchBalance } = useReadContract({
     address: USDC_ADDRESS,
     abi: erc20Abi,
@@ -136,565 +129,666 @@ export default function App() {
     chainId: ARC_CHAIN_ID,
     query: { enabled: !!address },
   })
-
   const balanceDisplay = usdcBalance != null
-    ? Number(formatUnits(usdcBalance as bigint, USDC_DECIMALS)).toFixed(2)
+    ? parseFloat(formatUnits(usdcBalance as bigint, USDC_DECIMALS)).toFixed(2)
     : '—'
 
-  // ── Pay tab state ──────────────────────────────────────────────────────────
-  const [payTo, setPayTo] = useState(() => new URLSearchParams(window.location.search).get('to') ?? '')
-  const [payAmount, setPayAmount] = useState(() => new URLSearchParams(window.location.search).get('amount') ?? '')
-  const [payNote, setPayNote] = useState('')
-  const [payStep, setPayStep] = useState<'idle' | 'approving' | 'sending' | 'done'>('idle')
-  const [payHash, setPayHash] = useState<`0x${string}` | undefined>()
-  const [history, setHistory] = useState<HistoryEntry[]>(() => {
-    try { return JSON.parse(localStorage.getItem('bachatpay-history') ?? '[]') as HistoryEntry[] }
-    catch { return [] }
-  })
+  // ── History & Favourites ──────────────────────────────────────────────────
+  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory)
+  const [favs, setFavs] = useState<Favourite[]>(loadFavourites)
 
-  const saveHistory = useCallback((entry: HistoryEntry) => {
+  const saveEntry = useCallback((e: HistoryEntry) => {
     setHistory(prev => {
-      const next = [entry, ...prev].slice(0, 50)
-      localStorage.setItem('bachatpay-history', JSON.stringify(next))
+      const next = [e, ...prev].slice(0, 50)
+      localStorage.setItem('bachat_history', JSON.stringify(next))
       return next
     })
   }, [])
 
-  // Transfer USDC
+  const toggleFav = useCallback((addr: string, name?: string) => {
+    setFavs(prev => {
+      const exists = prev.find(f => f.address.toLowerCase() === addr.toLowerCase())
+      const next = exists
+        ? prev.filter(f => f.address.toLowerCase() !== addr.toLowerCase())
+        : [...prev, { address: addr, name: name ?? shortAddr(addr) }]
+      localStorage.setItem('bachat_favs', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  const isFav = (addr: string) => favs.some(f => f.address.toLowerCase() === addr.toLowerCase())
+
+  // ── Pay tab ───────────────────────────────────────────────────────────────
+  const [payTo, setPayTo] = useState(() => new URLSearchParams(window.location.search).get('to') ?? '')
+  const [payAmount, setPayAmount] = useState(() => new URLSearchParams(window.location.search).get('amount') ?? '')
+  const [payNote, setPayNote] = useState(() => new URLSearchParams(window.location.search).get('note') ?? '')
+  const [payStep, setPayStep] = useState<'idle' | 'sending' | 'done'>('idle')
+  const [payHash, setPayHash] = useState<`0x${string}` | undefined>()
+
   const { writeContractAsync: transferUsdc } = useWriteContract()
   const { isSuccess: transferSuccess } = useWaitForTransactionReceipt({ hash: payHash, chainId: ARC_CHAIN_ID })
 
-  // Finalize after transfer confirmed onchain
   useEffect(() => {
     if (!transferSuccess || payStep !== 'sending' || !payHash) return
     setPayStep('done')
-    saveHistory({ hash: payHash, to: payTo, amount: payAmount, note: payNote, ts: Date.now() })
+    saveEntry({ hash: payHash, to: payTo, amount: payAmount, note: payNote, ts: Date.now(), dir: 'out' })
     void refetchBalance()
     toast.success('Payment sent!')
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transferSuccess]) // intentionally narrow — fires exactly once when tx confirms
+  }, [transferSuccess])
 
   const handlePay = useCallback(async () => {
     if (!address || !isAddress(payTo) || !payAmount) return
-    if (chainId !== ARC_CHAIN_ID) {
-      try { await switchChainAsync({ chainId: ARC_CHAIN_ID }) }
-      catch { toast.error('Please switch to Arc Mainnet'); return }
-    }
+    if (chainId !== ARC_CHAIN_ID) { await switchChainAsync({ chainId: ARC_CHAIN_ID }); return }
     try {
-      setPayStep('approving')
-      const amountRaw = parseUnits(payAmount, USDC_DECIMALS)
-      // For direct transfer we don't need approve, go straight to transfer
       setPayStep('sending')
       const hash = await transferUsdc({
         address: USDC_ADDRESS,
         abi: erc20Abi,
         functionName: 'transfer',
-        args: [payTo as `0x${string}`, amountRaw],
+        args: [payTo as `0x${string}`, parseUnits(payAmount, USDC_DECIMALS)],
         chainId: ARC_CHAIN_ID,
       })
       setPayHash(hash)
     } catch (e) {
-      toast.error((e as Error).message ?? 'Payment failed')
+      toast.error((e as Error).message?.slice(0, 80) ?? 'Payment failed')
       setPayStep('idle')
     }
-  }, [address, payTo, payAmount, chainId, switchChainAsync, transferUsdc])
+  }, [address, payTo, payAmount, payNote, chainId, switchChainAsync, transferUsdc])
 
-  const resetPay = () => {
-    setPayStep('idle')
-    setPayHash(undefined)
-    setPayTo('')
-    setPayAmount('')
-    setPayNote('')
-  }
+  const resetPay = () => { setPayStep('idle'); setPayTo(''); setPayAmount(''); setPayNote(''); setPayHash(undefined) }
 
-  // ── Receive tab — QR code ──────────────────────────────────────────────────
-  const [receiveAmount, setReceiveAmount] = useState('')
-  const [shareLink, setShareLink] = useState('')
-  const qrValue = shareLink
-    ? `${shareLink}?to=${address ?? ''}&amount=${receiveAmount}`
-    : `bachatpay:${address ?? ''}?amount=${receiveAmount}`
+  // ── QR Scanner ────────────────────────────────────────────────────────────
+  const [scanning, setScanning] = useState(false)
+  const scannerRef = useRef<Html5Qrcode | null>(null)
+  const scanDivId = 'qr-reader'
 
-  useEffect(() => {
-    void buildShareLink('/').then(base => setShareLink(base))
+  const startScan = useCallback(async () => {
+    setScanning(true)
+    setTab('pay')
+    await new Promise(r => setTimeout(r, 120))
+    const scanner = new Html5Qrcode(scanDivId)
+    scannerRef.current = scanner
+    try {
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        (text) => {
+          stopScan()
+          try {
+            const url = new URL(text)
+            const to = url.searchParams.get('to')
+            const amt = url.searchParams.get('amount')
+            const note = url.searchParams.get('note')
+            if (to && isAddress(to)) setPayTo(to)
+            if (amt) setPayAmount(amt)
+            if (note) setPayNote(note)
+          } catch {
+            if (isAddress(text)) setPayTo(text)
+          }
+          toast.success('QR scanned!')
+        },
+        () => { /* quiet scan errors */ },
+      )
+    } catch {
+      stopScan()
+      toast.error('Camera not available')
+    }
   }, [])
 
-  const copyQR = useCallback(async () => {
-    const link = `${shareLink}?to=${address ?? ''}&amount=${receiveAmount}`
-    await navigator.clipboard.writeText(link)
-    toast.success('Payment link copied!')
-  }, [shareLink, address, receiveAmount])
+  const stopScan = useCallback(() => {
+    const s = scannerRef.current
+    if (s) void (async () => { try { await s.stop() } catch { /* ignore */ } })()
+    scannerRef.current = null
+    setScanning(false)
+  }, [])
 
-  // URL params handled in useState initializers above (payTo, payAmount)
+  // ── Receive / QR tab ──────────────────────────────────────────────────────
+  const [receiveAmount, setReceiveAmount] = useState('')
+  const [shareLink, setShareLink] = useState('')
 
-  // ── Bridge tab ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!address) return
+    void buildShareLink(`/?to=${address}${receiveAmount ? `&amount=${receiveAmount}` : ''}`).then(setShareLink)
+  }, [address, receiveAmount])
+
+  const handleShare = useCallback(async () => {
+    if (!shareLink) return
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Pay me via BachatPay', text: `Send me USDC on Arc`, url: shareLink }) }
+      catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(shareLink)
+      toast.success('Link copied!')
+    }
+  }, [shareLink])
+
+  const handleWhatsApp = useCallback(() => {
+    if (!shareLink) return
+    const msg = encodeURIComponent(`Pay me ${receiveAmount ? `$${receiveAmount} USDC` : 'USDC'} via BachatPay: ${shareLink}`)
+    window.open(`https://wa.me/?text=${msg}`, '_blank')
+  }, [shareLink, receiveAmount])
+
+  // ── Split bill ────────────────────────────────────────────────────────────
+  const [splitTotal, setSplitTotal] = useState('')
+  const [splitPeople, setSplitPeople] = useState('2')
+  const [splitLink, setSplitLink] = useState('')
+  const [showSplit, setShowSplit] = useState(false)
+
+  useEffect(() => {
+    if (!address || !splitTotal || !splitPeople) return
+    const per = (parseFloat(splitTotal) / parseInt(splitPeople)).toFixed(2)
+    void buildShareLink(`/?to=${address}&amount=${per}&note=Split+bill`).then(setSplitLink)
+  }, [address, splitTotal, splitPeople])
+
+  // ── Bridge ────────────────────────────────────────────────────────────────
+  const [showBridge, setShowBridge] = useState(false)
   const [bridgeFrom, setBridgeFrom] = useState(BRIDGE_CHAINS[0])
   const [bridgeAmount, setBridgeAmount] = useState('')
   const [bridgeStep, setBridgeStep] = useState<'idle' | 'bridging' | 'done'>('idle')
-  const [bridgeSteps, setBridgeSteps] = useState<Array<{ name: string; state: string }>>([])
-  const bridgeResultRef = useRef<unknown>(null)
 
   const handleBridge = useCallback(async () => {
-    if (!connectorClient || !bridgeAmount || !address) return
+    if (!connectorClient || !bridgeAmount) return
+    if (chainId !== bridgeFrom.chain.id) {
+      await switchChainAsync({ chainId: bridgeFrom.chain.id })
+    }
     try {
       setBridgeStep('bridging')
-      setBridgeSteps([])
-
-      // Switch wallet to source chain
-      if (chainId !== bridgeFrom.chain.id) {
-        await switchChainAsync({ chainId: bridgeFrom.chain.id })
-      }
-
-      // Get raw EIP-1193 provider from connector transport
-      const rawProvider = (
-        connectorClient.transport as unknown as { provider?: EIP1193Provider }
-      ).provider
-      if (!rawProvider) throw new Error('Could not get wallet provider')
-
+      const rawProvider = (connectorClient.transport as unknown as { provider?: EIP1193Provider }).provider
+      if (!rawProvider) throw new Error('No provider')
       const adapter = await createViemAdapterFromProvider({
         provider: withAddChainFallback(rawProvider, [arc, ...BRIDGE_CHAINS.map(b => b.chain)]),
       })
-
-      const result = await appKit.bridge({
+      await appKit.bridge({
         token: 'USDC',
         from: { adapter, chain: bridgeFrom.kitName as Parameters<typeof appKit.bridge>[0]['from']['chain'] },
         to: { adapter, chain: 'Arc' as Parameters<typeof appKit.bridge>[0]['to']['chain'] },
         amount: bridgeAmount,
       })
-
-      bridgeResultRef.current = result
-      const steps = (result as { steps?: Array<{ name: string; state: string }> }).steps
-      if (steps) setBridgeSteps(steps)
       setBridgeStep('done')
       void refetchBalance()
       toast.success(`Bridged ${bridgeAmount} USDC to Arc!`)
     } catch (e) {
-      toast.error((e as Error).message ?? 'Bridge failed')
+      toast.error((e as Error).message?.slice(0, 80) ?? 'Bridge failed')
       setBridgeStep('idle')
     }
-  }, [connectorClient, bridgeAmount, address, chainId, bridgeFrom, switchChainAsync, refetchBalance])
+  }, [connectorClient, bridgeAmount, bridgeFrom, chainId, switchChainAsync, refetchBalance])
 
-  // ── Tabs config ────────────────────────────────────────────────────────────
-  const tabs = [
-    { id: 'pay' as const, label: 'Pay', icon: <Send className="size-4" /> },
-    { id: 'receive' as const, label: 'Receive', icon: <QrCode className="size-4" /> },
-    { id: 'bridge' as const, label: 'Bridge', icon: <ArrowLeftRight className="size-4" /> },
-    { id: 'history' as const, label: 'History', icon: <Clock className="size-4" /> },
-  ]
+  // ── Render ────────────────────────────────────────────────────────────────
+  const recentContacts = [...new Map(
+    history.filter(h => h.dir === 'out').map(h => [h.to, h])
+  ).values()].slice(0, 5)
 
   return (
-    <div className="relative min-h-dvh overflow-hidden" style={{ background: 'linear-gradient(180deg, #f9f9fc 0%, #fffcf7 52%, #fbf7f2 100%)' }}>
-      {/* Background blobs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div style={{ position: 'absolute', top: '8%', left: '5%', width: 280, height: 280, borderRadius: '50%', background: 'radial-gradient(circle, rgba(133,177,237,0.22) 0%, transparent 70%)', filter: 'blur(60px)' }} />
-        <div style={{ position: 'absolute', bottom: '8%', right: '8%', width: 260, height: 260, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,205,131,0.20) 0%, transparent 70%)', filter: 'blur(58px)' }} />
+    <div className="relative min-h-dvh overflow-hidden" style={{ background: 'linear-gradient(160deg,#f0f7ff 0%,#fffdf7 50%,#f7f0ff 100%)' }}>
+      {/* blobs */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div style={{ position:'absolute', top:'5%', left:'10%', width:260, height:260, borderRadius:'50%', background:'radial-gradient(circle,rgba(100,170,255,0.18) 0%,transparent 70%)', filter:'blur(50px)' }} />
+        <div style={{ position:'absolute', bottom:'12%', right:'5%', width:220, height:220, borderRadius:'50%', background:'radial-gradient(circle,rgba(200,160,255,0.16) 0%,transparent 70%)', filter:'blur(50px)' }} />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-md px-4 pb-10 pt-6">
-        {/* Header */}
-        <header className="mb-5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex size-9 items-center justify-center rounded-xl" style={{ background: spectral }}>
-              <ShoppingBag className="size-5 text-white" />
-            </div>
-            <div>
-              <span className="display block text-base font-bold" style={{ color: '#0f1e2e', letterSpacing: '-0.02em' }}>BachatPay</span>
-              <span className="block text-xs" style={{ color: '#6b7a8d' }}>USDC payments on Arc</span>
-            </div>
+      {/* ── HEADER ── */}
+      <header className="relative z-10 flex items-center justify-between px-4 pt-safe-top pb-3 pt-4" style={glass.card}>
+        <div className="flex items-center gap-2">
+          <div className="flex size-8 items-center justify-center rounded-full" style={{ background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)' }}>
+            <TokenUSDC size={18} variant="branded" />
           </div>
-          <ConnectKitButton />
-        </header>
+          <span className="text-base font-bold tracking-tight" style={{ fontFamily:'Space Grotesk,sans-serif', color:'#0f1c35' }}>BachatPay</span>
+        </div>
+        <ConnectKitButton />
+      </header>
 
-        {/* Balance hero card */}
-        {isConnected && (
-          <div className="mb-4 p-5" style={glass.card}>
-            <div style={{ height: 3, borderRadius: 2, background: spectral, marginBottom: 16, marginLeft: -20, marginRight: -20, marginTop: -20, borderTopLeftRadius: 20, borderTopRightRadius: 20 }} />
-            <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: '#6b7a8d' }}>USDC Balance · Arc Mainnet</p>
-            <div className="flex items-end gap-2">
-              <span className="display text-4xl font-bold tabular-nums" style={{ color: '#0f1e2e', letterSpacing: '-0.03em' }}>{balanceDisplay}</span>
-              <div className="mb-1 flex items-center gap-1">
-                <TokenUSDC size={20} />
-                <span className="text-sm font-semibold" style={{ color: '#6b7a8d' }}>USDC</span>
+      {/* ── CONTENT ── */}
+      <main className="relative z-10 mx-auto max-w-md px-4 pb-28 pt-4 space-y-4">
+
+        {/* HOME TAB */}
+        {tab === 'home' && (
+          <>
+            {/* Balance hero */}
+            <div className="rounded-2xl p-5" style={glass.card}>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color:'#6b7c99' }}>Your USDC Balance</p>
+              <div className="flex items-end gap-2 mb-4">
+                <span className="text-4xl font-bold tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:'#0f1c35' }}>${balanceDisplay}</span>
+                <span className="mb-1 text-sm font-semibold" style={{ color:'#6b7c99' }}>USDC · Arc</span>
+              </div>
+              {/* Action row */}
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { icon: <Send size={20} />, label: 'Send', action: () => setTab('pay') },
+                  { icon: <QrCode size={20} />, label: 'Receive', action: () => setTab('receive') },
+                  { icon: <ScanLine size={20} />, label: 'Scan', action: () => void startScan() },
+                  { icon: <Zap size={20} />, label: 'Bridge', action: () => setShowBridge(true) },
+                ].map(({ icon, label, action }) => (
+                  <button key={label} onClick={action}
+                    className="flex flex-col items-center gap-1 rounded-xl py-3 transition active:scale-95"
+                    style={{ background:'rgba(59,130,246,0.08)', color:'#1d4ed8', minHeight:56 }}>
+                    {icon}
+                    <span className="text-xs font-semibold">{label}</span>
+                  </button>
+                ))}
               </div>
             </div>
-          </div>
+
+            {/* Favourites */}
+            {favs.length > 0 && (
+              <div className="rounded-2xl p-4" style={glass.card}>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color:'#6b7c99' }}>Favourites</p>
+                <div className="flex gap-3 overflow-x-auto pb-1">
+                  {favs.map(f => (
+                    <button key={f.address} onClick={() => { setPayTo(f.address); setTab('pay') }}
+                      className="flex flex-col items-center gap-1 min-w-[60px] transition active:scale-95">
+                      <div className="flex size-12 items-center justify-center rounded-full text-white text-base font-bold"
+                        style={{ background:'linear-gradient(135deg,#3b82f6,#8b5cf6)' }}>
+                        {f.name.slice(0, 1).toUpperCase()}
+                      </div>
+                      <span className="text-xs font-medium" style={{ color:'#0f1c35' }}>{f.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recent */}
+            {recentContacts.length > 0 && (
+              <div className="rounded-2xl p-4" style={glass.card}>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color:'#6b7c99' }}>Recent</p>
+                <div className="space-y-2">
+                  {recentContacts.map(h => (
+                    <button key={h.to} onClick={() => { setPayTo(h.to); setTab('pay') }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition active:scale-95"
+                      style={{ background:'rgba(255,255,255,0.5)' }}>
+                      <div className="flex size-10 items-center justify-center rounded-full text-white text-sm font-bold flex-shrink-0"
+                        style={{ background:'linear-gradient(135deg,#10b981,#3b82f6)' }}>
+                        {h.to.slice(2, 4).toUpperCase()}
+                      </div>
+                      <div className="flex-1 text-left">
+                        <p className="text-sm font-semibold" style={{ color:'#0f1c35' }}>{shortAddr(h.to)}</p>
+                        <p className="text-xs" style={{ color:'#6b7c99' }}>${h.amount} USDC · {fmtDate(h.ts)}</p>
+                      </div>
+                      <ChevronRight size={14} style={{ color:'#6b7c99' }} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Split bill shortcut */}
+            <button onClick={() => setShowSplit(true)}
+              className="flex w-full items-center gap-3 rounded-2xl p-4 transition active:scale-95"
+              style={glass.card}>
+              <div className="flex size-10 items-center justify-center rounded-full" style={{ background:'rgba(16,185,129,0.12)', color:'#059669' }}>
+                <Users size={20} />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold" style={{ color:'#0f1c35' }}>Split Bill</p>
+                <p className="text-xs" style={{ color:'#6b7c99' }}>Divide a bill and share payment links</p>
+              </div>
+              <ChevronRight size={16} style={{ color:'#6b7c99' }} />
+            </button>
+
+            {/* Connect prompt */}
+            {!isConnected && (
+              <div className="rounded-2xl p-5 text-center" style={glass.card}>
+                <Wallet size={32} className="mx-auto mb-2" style={{ color:'#3b82f6' }} />
+                <p className="font-semibold mb-1" style={{ color:'#0f1c35' }}>Connect your wallet</p>
+                <p className="text-sm mb-3" style={{ color:'#6b7c99' }}>Use MetaMask, Coinbase Wallet, or scan with your phone</p>
+                <ConnectKitButton />
+              </div>
+            )}
+          </>
         )}
 
-        {/* Tab bar */}
-        <div className="mb-4 flex rounded-2xl p-1 gap-1" style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.7)' }}>
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-all"
-              style={tab === t.id
-                ? { background: 'white', color: '#0f1e2e', boxShadow: '0 2px 8px rgba(15,30,46,0.10)' }
-                : { color: '#6b7a8d' }}
-            >
-              {t.icon}
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── PAY TAB ───────────────────────────────────────────────────────── */}
+        {/* PAY TAB */}
         {tab === 'pay' && (
-          <div style={glass.card} className="p-5">
+          <div className="rounded-2xl p-5" style={glass.card}>
             {payStep === 'done' && payHash ? (
-              <div className="flex flex-col items-center py-4 gap-3 text-center">
-                <CheckCircle2 className="size-12" style={{ color: '#22c55e' }} />
-                <div>
-                  <p className="display text-lg font-bold" style={{ color: '#0f1e2e' }}>Payment Sent!</p>
-                  <p className="text-sm mt-1" style={{ color: '#6b7a8d' }}>{payAmount} USDC to {payTo.slice(0, 6)}...{payTo.slice(-4)}</p>
+              <div className="text-center py-4">
+                <CheckCircle2 size={48} className="mx-auto mb-3" style={{ color:'#10b981' }} />
+                <p className="text-lg font-bold mb-1" style={{ color:'#0f1c35' }}>Sent!</p>
+                <p className="text-sm mb-4" style={{ color:'#6b7c99' }}>${payAmount} USDC to {shortAddr(payTo)}</p>
+                <div className="flex gap-2 justify-center">
+                  <a href={`${EXPLORER}/tx/${payHash}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 rounded-xl px-4 py-2.5 text-sm font-semibold"
+                    style={{ background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>
+                    <ExternalLink size={14} /> Explorer
+                  </a>
+                  <button onClick={resetPay}
+                    className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white"
+                    style={{ background:'#1d4ed8' }}>
+                    Send Again
+                  </button>
                 </div>
-                <a
-                  href={`${EXPLORER}/tx/${payHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs font-medium"
-                  style={{ color: '#3b82f6' }}
-                >
-                  View on Explorer <ExternalLink className="size-3" />
-                </a>
-                <button
-                  onClick={resetPay}
-                  className="mt-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white"
-                  style={{ background: '#0f1e2e' }}
-                >
-                  New Payment
-                </button>
               </div>
             ) : (
               <>
-                <h2 className="display text-base font-bold mb-4" style={{ color: '#0f1e2e' }}>Send USDC</h2>
-
-                {/* Recipient */}
-                <div className="mb-3">
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#6b7a8d' }}>To</label>
-                  <input
-                    type="text"
-                    placeholder="0x... wallet address"
-                    value={payTo}
-                    onChange={e => setPayTo(e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 text-sm font-mono outline-none transition-all"
-                    style={{ ...glass.inner, color: '#0f1e2e' }}
-                  />
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-bold text-base" style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}>Send USDC</h2>
+                  <button onClick={() => void startScan()} className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold"
+                    style={{ background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>
+                    <ScanLine size={14} /> Scan QR
+                  </button>
                 </div>
 
-                {/* Amount */}
-                <div className="mb-3">
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#6b7a8d' }}>Amount (USDC)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      value={payAmount}
-                      onChange={e => setPayAmount(e.target.value)}
-                      className="w-full rounded-xl px-4 py-3 text-xl font-bold tabular-nums outline-none transition-all pr-16"
-                      style={{ ...glass.inner, color: '#0f1e2e' }}
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <TokenUSDC size={16} />
-                      <span className="text-xs font-semibold" style={{ color: '#6b7a8d' }}>USDC</span>
-                    </div>
+                {/* QR scanner viewport */}
+                {scanning && (
+                  <div className="relative mb-4 rounded-xl overflow-hidden" style={{ height: 260 }}>
+                    <div id={scanDivId} className="w-full h-full" />
+                    <button onClick={stopScan}
+                      className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full"
+                      style={{ background:'rgba(0,0,0,0.5)', color:'white' }}>
+                      <X size={14} />
+                    </button>
                   </div>
-                  {/* Quick amount chips */}
-                  <div className="flex gap-2 mt-2">
-                    {['1', '5', '10', '50'].map(v => (
-                      <button
-                        key={v}
-                        onClick={() => setPayAmount(v)}
-                        className="rounded-lg px-3 py-1 text-xs font-semibold transition-all"
-                        style={{ background: 'rgba(255,255,255,0.7)', color: '#0f1e2e', border: '1px solid rgba(255,255,255,0.8)' }}
-                      >
-                        ${v}
+                )}
+
+                {/* To address */}
+                <div className="mb-3" style={glass.inner}>
+                  <div className="rounded-xl p-3">
+                    <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>To</label>
+                    <input
+                      value={payTo}
+                      onChange={e => setPayTo(e.target.value)}
+                      placeholder="0x wallet address"
+                      className="w-full bg-transparent text-sm outline-none font-mono"
+                      style={{ color:'#0f1c35' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Favourites quick-select */}
+                {favs.length > 0 && !payTo && (
+                  <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
+                    {favs.map(f => (
+                      <button key={f.address} onClick={() => setPayTo(f.address)}
+                        className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold"
+                        style={{ background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>
+                        {f.name}
                       </button>
                     ))}
                   </div>
+                )}
+
+                {/* Amount */}
+                <div className="mb-3" style={glass.inner}>
+                  <div className="rounded-xl p-3">
+                    <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Amount (USDC)</label>
+                    <input
+                      value={payAmount}
+                      onChange={e => setPayAmount(e.target.value)}
+                      placeholder="0.00"
+                      type="number"
+                      inputMode="decimal"
+                      className="w-full bg-transparent text-2xl font-bold outline-none tabular-nums"
+                      style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Quick chips */}
+                <div className="flex gap-2 mb-3 flex-wrap">
+                  {QUICK_AMOUNTS.map(a => (
+                    <button key={a} onClick={() => setPayAmount(a)}
+                      className="rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95"
+                      style={payAmount === a
+                        ? { background:'#1d4ed8', color:'white' }
+                        : { background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>
+                      ${a}
+                    </button>
+                  ))}
                 </div>
 
                 {/* Note */}
-                <div className="mb-4">
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#6b7a8d' }}>Note (optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Groceries, Coffee..."
-                    value={payNote}
-                    onChange={e => setPayNote(e.target.value)}
-                    className="w-full rounded-xl px-4 py-3 text-sm outline-none"
-                    style={{ ...glass.inner, color: '#0f1e2e' }}
-                  />
+                <div className="mb-4" style={glass.inner}>
+                  <div className="rounded-xl p-3">
+                    <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Note (optional)</label>
+                    <input
+                      value={payNote}
+                      onChange={e => setPayNote(e.target.value)}
+                      placeholder="Groceries, chai, rent…"
+                      className="w-full bg-transparent text-sm outline-none"
+                      style={{ color:'#0f1c35' }}
+                    />
+                  </div>
                 </div>
 
-                {!isConnected ? (
-                  <div className="flex justify-center">
-                    <ConnectKitButton />
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => void handlePay()}
-                    disabled={!payTo || !payAmount || payStep !== 'idle'}
-                    className="w-full rounded-xl py-3.5 text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-50"
-                    style={{ background: '#0f1e2e' }}
-                  >
-                    {payStep === 'sending' ? (
-                      <><Loader2 className="size-4 animate-spin" /> Sending...</>
-                    ) : (
-                      <><Send className="size-4" /> Pay {payAmount ? `$${payAmount}` : ''} USDC</>
-                    )}
+                {/* Fav toggle */}
+                {isAddress(payTo) && (
+                  <button onClick={() => toggleFav(payTo)}
+                    className="flex items-center gap-1.5 mb-4 text-xs font-semibold"
+                    style={{ color: isFav(payTo) ? '#f59e0b' : '#6b7c99' }}>
+                    {isFav(payTo) ? <Star size={14} /> : <StarOff size={14} />}
+                    {isFav(payTo) ? 'Saved to favourites' : 'Save to favourites'}
                   </button>
                 )}
 
-                {chainId !== ARC_CHAIN_ID && isConnected && (
-                  <p className="text-center text-xs mt-2" style={{ color: '#f59e0b' }}>
-                    Switch to Arc Mainnet to pay
-                  </p>
-                )}
+                {/* Pay button */}
+                <button
+                  onClick={() => void handlePay()}
+                  disabled={!isConnected || !isAddress(payTo) || !payAmount || payStep === 'sending'}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white transition active:scale-95 disabled:opacity-50"
+                  style={{ background:'linear-gradient(135deg,#1d4ed8,#7c3aed)', minHeight:56 }}>
+                  {payStep === 'sending'
+                    ? <><Loader2 size={18} className="animate-spin" /> Sending…</>
+                    : <><Send size={18} /> Pay {payAmount ? `$${payAmount}` : ''} USDC</>}
+                </button>
               </>
             )}
           </div>
         )}
 
-        {/* ── RECEIVE TAB ───────────────────────────────────────────────────── */}
+        {/* RECEIVE TAB */}
         {tab === 'receive' && (
-          <div style={glass.card} className="p-5">
-            <h2 className="display text-base font-bold mb-4" style={{ color: '#0f1e2e' }}>Receive USDC</h2>
+          <div className="rounded-2xl p-5 text-center" style={glass.card}>
+            <h2 className="font-bold text-base mb-4" style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}>Receive USDC</h2>
 
-            {!isConnected ? (
-              <div className="flex flex-col items-center gap-3 py-6">
-                <QrCode className="size-12" style={{ color: '#d1d5db' }} />
-                <p className="text-sm" style={{ color: '#6b7a8d' }}>Connect your wallet to generate a QR code</p>
-                <ConnectKitButton />
-              </div>
-            ) : (
+            {address ? (
               <>
-                <div className="mb-4">
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#6b7a8d' }}>Request Amount (optional)</label>
-                  <div className="relative">
+                <div className="mx-auto mb-4 rounded-2xl p-4 inline-block" style={{ background:'white' }}>
+                  <QRCodeSVG value={shareLink || `https://bachat-pay.vercel.app/?to=${address}`} size={200} />
+                </div>
+                <p className="text-xs font-mono mb-4 px-2 break-all" style={{ color:'#6b7c99' }}>{address}</p>
+
+                {/* Request amount */}
+                <div className="mb-4 text-left" style={glass.inner}>
+                  <div className="rounded-xl p-3">
+                    <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Request amount (optional)</label>
                     <input
-                      type="number"
-                      placeholder="0.00"
                       value={receiveAmount}
                       onChange={e => setReceiveAmount(e.target.value)}
-                      className="w-full rounded-xl px-4 py-3 text-xl font-bold tabular-nums outline-none pr-16"
-                      style={{ ...glass.inner, color: '#0f1e2e' }}
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <TokenUSDC size={16} />
-                      <span className="text-xs font-semibold" style={{ color: '#6b7a8d' }}>USDC</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* QR code */}
-                <div className="flex flex-col items-center gap-4">
-                  <div className="p-4 rounded-2xl" style={{ background: 'white', boxShadow: '0 4px 24px rgba(15,30,46,0.08)' }}>
-                    <QRCodeSVG
-                      value={qrValue}
-                      size={200}
-                      level="M"
-                      includeMargin={false}
-                    />
-                  </div>
-
-                  <div className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-2" style={glass.inner}>
-                    <span className="text-xs font-mono truncate" style={{ color: '#6b7a8d' }}>
-                      {address?.slice(0, 10)}...{address?.slice(-6)}
-                    </span>
-                    <button
-                      onClick={() => void copyQR()}
-                      className="flex items-center gap-1 text-xs font-semibold shrink-0"
-                      style={{ color: '#3b82f6' }}
-                    >
-                      <Copy className="size-3" /> Copy Link
-                    </button>
-                  </div>
-
-                  <p className="text-xs text-center" style={{ color: '#6b7a8d' }}>
-                    Show this QR to anyone. They scan it and pay you USDC on Arc instantly.
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ── BRIDGE TAB ────────────────────────────────────────────────────── */}
-        {tab === 'bridge' && (
-          <div style={glass.card} className="p-5">
-            <h2 className="display text-base font-bold mb-1" style={{ color: '#0f1e2e' }}>Bridge to Arc</h2>
-            <p className="text-sm mb-4" style={{ color: '#6b7a8d' }}>Bring USDC from any chain to Arc automatically</p>
-
-            {bridgeStep === 'done' ? (
-              <div className="flex flex-col items-center py-4 gap-3 text-center">
-                <CheckCircle2 className="size-12" style={{ color: '#22c55e' }} />
-                <p className="display text-lg font-bold" style={{ color: '#0f1e2e' }}>Bridged Successfully!</p>
-                <p className="text-sm" style={{ color: '#6b7a8d' }}>{bridgeAmount} USDC is now on Arc Mainnet</p>
-                <button
-                  onClick={() => { setBridgeStep('idle'); setBridgeAmount(''); setBridgeSteps([]) }}
-                  className="mt-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white"
-                  style={{ background: '#0f1e2e' }}
-                >
-                  Bridge More
-                </button>
-              </div>
-            ) : (
-              <>
-                {/* Source chain selector */}
-                <div className="mb-3">
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#6b7a8d' }}>From</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {BRIDGE_CHAINS.map(b => (
-                      <button
-                        key={b.kitName}
-                        onClick={() => setBridgeFrom(b)}
-                        className="rounded-xl py-2 text-xs font-semibold transition-all"
-                        style={bridgeFrom.kitName === b.kitName
-                          ? { background: '#0f1e2e', color: 'white' }
-                          : { ...glass.inner, color: '#6b7a8d' }}
-                      >
-                        {b.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Arrow */}
-                <div className="flex justify-center my-3">
-                  <div className="flex size-8 items-center justify-center rounded-full" style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.9)' }}>
-                    <ArrowDown className="size-4" style={{ color: '#6b7a8d' }} />
-                  </div>
-                </div>
-
-                {/* Destination — always Arc */}
-                <div className="mb-3 rounded-xl px-4 py-3 flex items-center justify-between" style={glass.inner}>
-                  <span className="text-sm font-semibold" style={{ color: '#0f1e2e' }}>Arc Mainnet</span>
-                  <div className="flex items-center gap-1">
-                    <TokenUSDC size={16} />
-                    <span className="text-xs" style={{ color: '#6b7a8d' }}>USDC</span>
-                  </div>
-                </div>
-
-                {/* Amount */}
-                <div className="mb-4">
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#6b7a8d' }}>Amount (USDC)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
                       placeholder="0.00"
-                      value={bridgeAmount}
-                      onChange={e => setBridgeAmount(e.target.value)}
-                      className="w-full rounded-xl px-4 py-3 text-xl font-bold tabular-nums outline-none pr-16"
-                      style={{ ...glass.inner, color: '#0f1e2e' }}
+                      type="number"
+                      inputMode="decimal"
+                      className="w-full bg-transparent text-xl font-bold outline-none tabular-nums"
+                      style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}
                     />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <TokenUSDC size={16} />
-                      <span className="text-xs font-semibold" style={{ color: '#6b7a8d' }}>USDC</span>
-                    </div>
                   </div>
                 </div>
 
-                {/* Bridge steps progress */}
-                {bridgeStep === 'bridging' && (
-                  <div className="mb-4 flex flex-col gap-2">
-                    {['approve', 'burn', 'fetchAttestation', 'mint'].map(stepName => {
-                      const s = bridgeSteps.find(x => x.name === stepName)
-                      const done = s?.state === 'success'
-                      const active = bridgeStep === 'bridging' && !done && bridgeSteps.length > 0
-                      return (
-                        <div key={stepName} className="flex items-center gap-2 text-xs">
-                          {done ? (
-                            <CheckCircle2 className="size-4 shrink-0" style={{ color: '#22c55e' }} />
-                          ) : active ? (
-                            <Loader2 className="size-4 shrink-0 animate-spin" style={{ color: '#6b7a8d' }} />
-                          ) : (
-                            <div className="size-4 rounded-full border-2 shrink-0" style={{ borderColor: '#d1d5db' }} />
-                          )}
-                          <span style={{ color: done ? '#22c55e' : '#6b7a8d' }} className="capitalize">
-                            {stepName === 'fetchAttestation' ? 'Attestation' : stepName}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                {/* Quick receive chips */}
+                <div className="flex gap-2 mb-4 justify-center flex-wrap">
+                  {QUICK_AMOUNTS.map(a => (
+                    <button key={a} onClick={() => setReceiveAmount(a)}
+                      className="rounded-full px-3 py-1.5 text-xs font-semibold"
+                      style={receiveAmount === a
+                        ? { background:'#1d4ed8', color:'white' }
+                        : { background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>
+                      ${a}
+                    </button>
+                  ))}
+                </div>
 
-                {!isConnected ? (
-                  <div className="flex justify-center">
-                    <ConnectKitButton />
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => void handleBridge()}
-                    disabled={!bridgeAmount || bridgeStep === 'bridging'}
-                    className="w-full rounded-xl py-3.5 text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-50"
-                    style={{ background: spectral }}
-                  >
-                    {bridgeStep === 'bridging' ? (
-                      <><Loader2 className="size-4 animate-spin" /> Bridging...</>
-                    ) : (
-                      <><Zap className="size-4" /> Bridge {bridgeAmount ? `$${bridgeAmount}` : ''} to Arc</>
-                    )}
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={() => { void navigator.clipboard.writeText(shareLink); toast.success('Link copied!') }}
+                    className="flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-semibold"
+                    style={{ background:'rgba(59,130,246,0.08)', color:'#1d4ed8' }}>
+                    <Copy size={18} /> Copy
                   </button>
-                )}
-
-                <p className="text-xs text-center mt-3" style={{ color: '#6b7a8d' }}>
-                  Powered by Circle CCTP — ~20 seconds
-                </p>
+                  <button onClick={() => void handleShare()}
+                    className="flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-semibold"
+                    style={{ background:'rgba(59,130,246,0.08)', color:'#1d4ed8' }}>
+                    <Share2 size={18} /> Share
+                  </button>
+                  <button onClick={handleWhatsApp}
+                    className="flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-semibold"
+                    style={{ background:'rgba(37,211,102,0.1)', color:'#16a34a' }}>
+                    <span className="text-lg leading-none">💬</span> WhatsApp
+                  </button>
+                </div>
               </>
+            ) : (
+              <div className="py-8">
+                <p className="text-sm mb-4" style={{ color:'#6b7c99' }}>Connect your wallet to show your QR code</p>
+                <ConnectKitButton />
+              </div>
             )}
           </div>
         )}
 
-        {/* ── HISTORY TAB ───────────────────────────────────────────────────── */}
+        {/* HISTORY TAB */}
         {tab === 'history' && (
-          <div style={glass.card} className="p-5">
-            <h2 className="display text-base font-bold mb-4" style={{ color: '#0f1e2e' }}>Payment History</h2>
+          <div className="rounded-2xl p-4" style={glass.card}>
+            <h2 className="font-bold text-base mb-4" style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}>Transaction History</h2>
             {history.length === 0 ? (
-              <div className="flex flex-col items-center py-8 gap-3">
-                <Clock className="size-10" style={{ color: '#d1d5db' }} />
-                <p className="text-sm" style={{ color: '#6b7a8d' }}>No payments yet</p>
-              </div>
+              <p className="text-sm text-center py-8" style={{ color:'#6b7c99' }}>No transactions yet</p>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="space-y-2">
                 {history.map(h => (
-                  <a
-                    key={h.hash}
-                    href={`${EXPLORER}/tx/${h.hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between rounded-xl px-4 py-3 transition-all hover:opacity-80"
-                    style={glass.inner}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Send className="size-4 shrink-0" style={{ color: '#22c55e' }} />
-                      <div>
-                        <p className="text-sm font-semibold" style={{ color: '#0f1e2e' }}>
-                          ${h.amount} USDC
-                        </p>
-                        <p className="text-xs font-mono" style={{ color: '#6b7a8d' }}>
-                          {h.to.slice(0, 8)}...{h.to.slice(-4)}
-                          {h.note ? ` · ${h.note}` : ''}
-                        </p>
-                      </div>
+                  <a key={h.hash} href={`${EXPLORER}/tx/${h.hash}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-3 rounded-xl px-3 py-3 transition active:scale-95"
+                    style={{ background:'rgba(255,255,255,0.5)' }}>
+                    <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-full"
+                      style={{ background: h.dir === 'out' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', color: h.dir === 'out' ? '#dc2626' : '#059669' }}>
+                      {h.dir === 'out' ? <Send size={16} /> : <ArrowDownLeft size={16} />}
                     </div>
-                    <ChevronRight className="size-4 shrink-0" style={{ color: '#d1d5db' }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color:'#0f1c35' }}>
+                        {h.dir === 'out' ? `To ${shortAddr(h.to)}` : `From ${shortAddr(h.to)}`}
+                      </p>
+                      <p className="text-xs truncate" style={{ color:'#6b7c99' }}>
+                        {h.note || 'USDC transfer'} · {fmtDate(h.ts)}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold flex-shrink-0" style={{ color: h.dir === 'out' ? '#dc2626' : '#059669' }}>
+                      {h.dir === 'out' ? '-' : '+'}${h.amount}
+                    </span>
                   </a>
                 ))}
               </div>
             )}
           </div>
         )}
+      </main>
 
-        {/* Footer */}
-        <footer className="mt-8 text-center">
-          <p className="text-xs" style={{ color: '#9ca3af' }}>
-            BachatPay · USDC on{' '}
-            <a href="https://arc.io" target="_blank" rel="noopener noreferrer" style={{ color: '#6b7a8d' }}>Arc Mainnet</a>
-            {' '}· Built with{' '}
-            <a href="https://studio.arc.io" target="_blank" rel="noopener noreferrer" style={{ color: '#6b7a8d' }}>Arc Studio</a>
-          </p>
-        </footer>
-      </div>
+      {/* ── BOTTOM NAV ── */}
+      <nav className="fixed bottom-0 inset-x-0 z-20 pb-safe-bottom" style={glass.card}>
+        <div className="mx-auto max-w-md flex">
+          {([
+            { id: 'home', icon: <Wallet size={22} />, label: 'Home' },
+            { id: 'pay', icon: <Send size={22} />, label: 'Pay' },
+            { id: 'receive', icon: <QrCode size={22} />, label: 'Receive' },
+            { id: 'history', icon: <History size={22} />, label: 'History' },
+          ] as { id: Tab; icon: React.ReactNode; label: string }[]).map(({ id, icon, label }) => (
+            <button key={id} onClick={() => setTab(id)}
+              className="flex flex-1 flex-col items-center gap-0.5 py-3 transition"
+              style={{ color: tab === id ? '#1d4ed8' : '#9ca3af', minHeight: 60 }}>
+              {icon}
+              <span className="text-xs font-semibold">{label}</span>
+              {tab === id && <div className="h-0.5 w-6 rounded-full mt-0.5" style={{ background:'#1d4ed8' }} />}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {/* ── SPLIT BILL SHEET ── */}
+      {showSplit && (
+        <div className="fixed inset-0 z-30 flex items-end" style={{ background:'rgba(0,0,0,0.4)' }} onClick={() => setShowSplit(false)}>
+          <div className="w-full rounded-t-3xl p-6" style={{ ...glass.card, maxWidth:448, margin:'0 auto' }} onClick={e => e.stopPropagation()}>
+            <div className="mb-1 h-1 w-10 rounded-full mx-auto" style={{ background:'#d1d5db' }} />
+            <h3 className="font-bold text-base mb-4 mt-2" style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}>Split Bill</h3>
+
+            <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Total amount ($)</label>
+            <input value={splitTotal} onChange={e => setSplitTotal(e.target.value)}
+              placeholder="0.00" type="number" inputMode="decimal"
+              className="w-full rounded-xl p-3 mb-3 text-xl font-bold outline-none tabular-nums"
+              style={{ ...glass.inner, color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }} />
+
+            <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Number of people</label>
+            <div className="flex gap-2 mb-4">
+              {['2','3','4','5','6'].map(n => (
+                <button key={n} onClick={() => setSplitPeople(n)}
+                  className="flex-1 rounded-xl py-2.5 text-sm font-bold transition"
+                  style={splitPeople === n ? { background:'#1d4ed8', color:'white' } : { background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+
+            {splitTotal && splitPeople && (
+              <div className="mb-4 rounded-xl p-3 text-center" style={{ background:'rgba(59,130,246,0.08)' }}>
+                <p className="text-xs" style={{ color:'#6b7c99' }}>Each person pays</p>
+                <p className="text-2xl font-bold" style={{ color:'#1d4ed8', fontFamily:'Space Grotesk,sans-serif' }}>
+                  ${(parseFloat(splitTotal || '0') / parseInt(splitPeople || '1')).toFixed(2)}
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => { void navigator.clipboard.writeText(splitLink); toast.success('Split link copied!') }}
+                className="flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold"
+                style={{ background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>
+                <Copy size={16} /> Copy Link
+              </button>
+              <button onClick={() => {
+                const msg = encodeURIComponent(`Pay your share: ${splitLink}`)
+                window.open(`https://wa.me/?text=${msg}`, '_blank')
+              }}
+                className="flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white"
+                style={{ background:'#25d366' }}>
+                <span>💬</span> WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── BRIDGE SHEET ── */}
+      {showBridge && (
+        <div className="fixed inset-0 z-30 flex items-end" style={{ background:'rgba(0,0,0,0.4)' }} onClick={() => setShowBridge(false)}>
+          <div className="w-full rounded-t-3xl p-6" style={{ ...glass.card, maxWidth:448, margin:'0 auto' }} onClick={e => e.stopPropagation()}>
+            <div className="mb-1 h-1 w-10 rounded-full mx-auto" style={{ background:'#d1d5db' }} />
+            <h3 className="font-bold text-base mb-1 mt-2" style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}>Bridge USDC to Arc</h3>
+            <p className="text-xs mb-4" style={{ color:'#6b7c99' }}>Move USDC from another chain to Arc for near-zero fees</p>
+
+            <label className="text-xs font-semibold mb-2 block" style={{ color:'#6b7c99' }}>From chain</label>
+            <div className="flex gap-2 mb-4 flex-wrap">
+              {BRIDGE_CHAINS.map(b => (
+                <button key={b.label} onClick={() => setBridgeFrom(b)}
+                  className="rounded-xl px-3 py-2 text-xs font-bold transition"
+                  style={bridgeFrom.label === b.label ? { background:'#1d4ed8', color:'white' } : { background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>
+                  {b.label}
+                </button>
+              ))}
+            </div>
+
+            <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Amount (USDC)</label>
+            <input value={bridgeAmount} onChange={e => setBridgeAmount(e.target.value)}
+              placeholder="0.00" type="number" inputMode="decimal"
+              className="w-full rounded-xl p-3 mb-4 text-xl font-bold outline-none tabular-nums"
+              style={{ ...glass.inner, color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }} />
+
+            <button onClick={() => void handleBridge()}
+              disabled={!isConnected || !bridgeAmount || bridgeStep === 'bridging'}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white disabled:opacity-50"
+              style={{ background:'linear-gradient(135deg,#1d4ed8,#7c3aed)', minHeight:56 }}>
+              {bridgeStep === 'bridging'
+                ? <><Loader2 size={18} className="animate-spin" /> Bridging…</>
+                : bridgeStep === 'done'
+                  ? <><CheckCircle2 size={18} /> Bridged!</>
+                  : <>Bridge {bridgeAmount ? `$${bridgeAmount}` : ''} USDC to Arc</>}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
