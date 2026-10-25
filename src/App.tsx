@@ -23,6 +23,8 @@ import {
 } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { NANOPAY_TESTNET } from './nanopay-contract'
+import { SmartWallet } from './components/SmartWallet'
+import { UnifiedBalance } from './components/UnifiedBalance'
 
 // ── Arc Testnet constants (chain ID 5042002) ──────────────────────────────────
 // USDC on Arc Testnet: ERC-20 at 6 decimals
@@ -69,6 +71,7 @@ export default function App() {
 
   const [requestData, setRequestData] = useState('')
   const [step, setStep] = useState<'idle' | 'approving' | 'paying' | 'done'>('idle')
+  const [activeTab, setActiveTab] = useState<'pay' | 'bridge' | 'wallet'>('pay')
 
   // ── contract reads ─────────────────────────────────────────────────────────
 
@@ -301,8 +304,31 @@ export default function App() {
         </div>
       </section>
 
+      {/* Tab nav */}
+      <div className="w-full max-w-md flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface-muted)' }}>
+        {([
+          { id: 'pay', label: 'Pay' },
+          { id: 'bridge', label: 'Bridge & Balance' },
+          { id: 'wallet', label: 'Smart Wallet' },
+        ] as const).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => { setActiveTab(tab.id) }}
+            className="flex-1 py-2 text-xs font-600 rounded-xl transition-all"
+            style={{
+              fontWeight: 600,
+              background: activeTab === tab.id ? '#fff' : 'transparent',
+              color: activeTab === tab.id ? 'var(--ink)' : 'var(--muted)',
+              boxShadow: activeTab === tab.id ? '0 1px 4px rgba(18,45,69,0.08)' : 'none',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Pay card */}
-      <section className="w-full max-w-md mb-4" style={glass.card}>
+      {activeTab === 'pay' && <><section className="w-full max-w-md mb-4" style={glass.card}>
         <div className="p-6">
           <h2 className="display text-lg mb-1" style={{ color: 'var(--ink)', fontWeight: 700 }}>
             Register a Bachat Call
@@ -448,7 +474,21 @@ export default function App() {
             ))}
           </div>
         </div>
-      </section>
+      </section></>}
+
+      {/* Bridge & Balance tab */}
+      {activeTab === 'bridge' && (
+        <div className="w-full max-w-md mb-4">
+          <UnifiedBalance contractAddress={NANOPAY_TESTNET.address} />
+        </div>
+      )}
+
+      {/* Smart Wallet tab */}
+      {activeTab === 'wallet' && (
+        <div className="w-full max-w-md mb-4">
+          <SmartWallet />
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="w-full max-w-md flex items-center justify-between text-xs pb-20" style={{ color: 'var(--subtle)' }}>
