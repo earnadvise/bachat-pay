@@ -22,16 +22,16 @@ import {
   Loader2, CheckCircle2, ChevronRight,
 } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
-import { NANOPAY_TESTNET } from './nanopay-contract'
+import { NANOPAY_MAINNET } from './nanopay-contract'
 import { SmartWallet } from './components/SmartWallet'
 import { UnifiedBalance } from './components/UnifiedBalance'
 
-// ── Arc Testnet constants (chain ID 5042002) ──────────────────────────────────
-// USDC on Arc Testnet: ERC-20 at 6 decimals
-const TARGET_CHAIN_ID = NANOPAY_TESTNET.chainId
+// ── Arc Mainnet constants (chain ID 5042) ─────────────────────────────────────
+// USDC on Arc Mainnet: ERC-20 at 6 decimals
+const TARGET_CHAIN_ID = NANOPAY_MAINNET.chainId
 const USDC_ADDRESS = '0x3600000000000000000000000000000000000000' as const
 const USDC_DECIMALS = 6
-const EXPLORER_BASE = 'https://explorer.testnet.arc.io'
+const EXPLORER_BASE = 'https://explorer.arc.io'
 
 const PRICE_DISPLAY = '0.10'
 const PRICE_RAW = parseUnits(PRICE_DISPLAY, USDC_DECIMALS)
@@ -76,15 +76,15 @@ export default function App() {
   // ── contract reads ─────────────────────────────────────────────────────────
 
   const { data: totalCalls, refetch: refetchTotal } = useReadContract({
-    address: NANOPAY_TESTNET.address,
-    abi: NANOPAY_TESTNET.abi,
+    address: NANOPAY_MAINNET.address,
+    abi: NANOPAY_MAINNET.abi,
     functionName: 'totalCalls',
     chainId: TARGET_CHAIN_ID,
   })
 
   const { data: myCallCount, refetch: refetchMyCalls } = useReadContract({
-    address: NANOPAY_TESTNET.address,
-    abi: NANOPAY_TESTNET.abi,
+    address: NANOPAY_MAINNET.address,
+    abi: NANOPAY_MAINNET.abi,
     functionName: 'callCount',
     args: address ? [address] : undefined,
     chainId: TARGET_CHAIN_ID,
@@ -92,8 +92,8 @@ export default function App() {
   })
 
   const { data: contractBalance, refetch: refetchBalance } = useReadContract({
-    address: NANOPAY_TESTNET.address,
-    abi: NANOPAY_TESTNET.abi,
+    address: NANOPAY_MAINNET.address,
+    abi: NANOPAY_MAINNET.abi,
     functionName: 'getBalance',
     chainId: TARGET_CHAIN_ID,
   })
@@ -139,8 +139,8 @@ export default function App() {
     setStep('paying')
     pay(
       {
-        address: NANOPAY_TESTNET.address,
-        abi: NANOPAY_TESTNET.abi,
+        address: NANOPAY_MAINNET.address,
+        abi: NANOPAY_MAINNET.abi,
         functionName: 'pay',
         args: [requestData.trim()],
         chainId: TARGET_CHAIN_ID,
@@ -171,7 +171,7 @@ export default function App() {
         address: USDC_ADDRESS,
         abi: erc20Abi,
         functionName: 'approve',
-        args: [NANOPAY_TESTNET.address, PRICE_RAW],
+        args: [NANOPAY_MAINNET.address, PRICE_RAW],
         chainId: TARGET_CHAIN_ID,
       },
       {
@@ -283,7 +283,7 @@ export default function App() {
           </div>
 
           <p className="text-xs mt-2" style={{ color: 'var(--muted)' }}>
-            Live · {shortenAddress(NANOPAY_TESTNET.address)}
+            Live · {shortenAddress(NANOPAY_MAINNET.address)}
           </p>
         </div>
 
@@ -479,7 +479,7 @@ export default function App() {
       {/* Bridge & Balance tab */}
       {activeTab === 'bridge' && (
         <div className="w-full max-w-md mb-4">
-          <UnifiedBalance contractAddress={NANOPAY_TESTNET.address} />
+          <UnifiedBalance contractAddress={NANOPAY_MAINNET.address} />
         </div>
       )}
 
@@ -493,7 +493,7 @@ export default function App() {
       {/* Footer */}
       <footer className="w-full max-w-md flex items-center justify-between text-xs pb-20" style={{ color: 'var(--subtle)' }}>
         <a
-          href={explorerAddr(NANOPAY_TESTNET.address)}
+          href={explorerAddr(NANOPAY_MAINNET.address)}
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1 hover:opacity-70 transition-opacity"

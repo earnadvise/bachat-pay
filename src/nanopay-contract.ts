@@ -10,10 +10,8 @@ export const NANOPAY_TESTNET = {
   chainId: 5042002, // Arc Testnet
 }
 
-// Mainnet address will be set after deploy — placeholder here so TypeScript is happy.
-// Update after: bun run deploy:mainnet
 export const NANOPAY_MAINNET = {
-  address: '' as `0x${string}`,
+  address: '0xa5d6C4a683d18a0f38CB68eC5345B95a17DEf306' as const,
   abi: artifact.abi,
   chainId: 5042, // Arc mainnet
 }
