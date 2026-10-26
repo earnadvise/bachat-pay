@@ -129,9 +129,10 @@ export default function App() {
     chainId: ARC_CHAIN_ID,
     query: { enabled: !!address },
   })
+  const onArc = chainId === ARC_CHAIN_ID
   const balanceDisplay = usdcBalance != null
     ? parseFloat(formatUnits(usdcBalance as bigint, USDC_DECIMALS)).toFixed(2)
-    : '—'
+    : onArc ? '…' : '—'
 
   // ── History & Favourites ──────────────────────────────────────────────────
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory)
@@ -344,12 +345,25 @@ export default function App() {
         {/* HOME TAB */}
         {tab === 'home' && (
           <>
+            {/* Wrong-chain banner */}
+            {isConnected && !onArc && (
+              <button
+                onClick={() => void switchChainAsync({ chainId: ARC_CHAIN_ID })}
+                className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold"
+                style={{ background:'#fef3c7', color:'#92400e', border:'1px solid #fde68a' }}>
+                <span>Switch to Arc mainnet to see balance and pay</span>
+                <span className="text-xs underline">Switch now</span>
+              </button>
+            )}
+
             {/* Balance hero */}
             <div className="rounded-2xl p-5" style={glass.card}>
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color:'#6b7c99' }}>Your USDC Balance</p>
               <div className="flex items-end gap-2 mb-4">
-                <span className="text-4xl font-bold tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:'#0f1c35' }}>${balanceDisplay}</span>
-                <span className="mb-1 text-sm font-semibold" style={{ color:'#6b7c99' }}>USDC · Arc</span>
+                <span className="text-4xl font-bold tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:'#0f1c35' }}>
+                  {!isConnected ? 'Connect wallet' : !onArc ? 'Switch chain' : `$${balanceDisplay}`}
+                </span>
+                {isConnected && onArc && <span className="mb-1 text-sm font-semibold" style={{ color:'#6b7c99' }}>USDC · Arc</span>}
               </div>
               {/* Action row */}
               <div className="grid grid-cols-4 gap-2">
@@ -561,16 +575,33 @@ export default function App() {
                   </button>
                 )}
 
+                {/* Wrong-chain warning on Pay tab */}
+                {isConnected && !onArc && (
+                  <button
+                    onClick={() => void switchChainAsync({ chainId: ARC_CHAIN_ID })}
+                    className="flex w-full items-center justify-between rounded-xl px-4 py-3 mb-3 text-sm font-semibold"
+                    style={{ background:'#fef3c7', color:'#92400e', border:'1px solid #fde68a' }}>
+                    <span>You're on the wrong network</span>
+                    <span className="text-xs underline">Switch to Arc</span>
+                  </button>
+                )}
+
                 {/* Pay button */}
                 <button
                   onClick={() => void handlePay()}
-                  disabled={!isConnected || !isAddress(payTo) || !payAmount || payStep === 'sending'}
+                  disabled={!isConnected || !onArc || !isAddress(payTo) || !payAmount || payStep === 'sending'}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white transition active:scale-95 disabled:opacity-50"
                   style={{ background:'linear-gradient(135deg,#1d4ed8,#7c3aed)', minHeight:56 }}>
                   {payStep === 'sending'
                     ? <><Loader2 size={18} className="animate-spin" /> Sending…</>
                     : <><Send size={18} /> Pay {payAmount ? `$${payAmount}` : ''} USDC</>}
                 </button>
+                {/* Hint under pay button */}
+                {isConnected && onArc && (!isAddress(payTo) || !payAmount) && (
+                  <p className="text-center text-xs mt-2" style={{ color:'#6b7c99' }}>
+                    {!payTo ? 'Enter a recipient address or scan their QR code' : !isAddress(payTo) ? 'Enter a valid wallet address (0x…)' : 'Enter an amount to continue'}
+                  </p>
+                )}
               </>
             )}
           </div>
