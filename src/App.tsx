@@ -3,6 +3,7 @@
  * Built with Arc Studio — https://studio.arc.io
  */
 
+import LandingPage from './LandingPage'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { ConnectKitButton } from 'connectkit'
 import {
@@ -111,8 +112,17 @@ function fmtDate(ts: number) {
   return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── Root component — routes between landing and app ───────────────────────────
 export default function App() {
+  const [showLanding, setShowLanding] = useState(() =>
+    !new URLSearchParams(window.location.search).get('to')
+  )
+  if (showLanding) return <LandingPage onEnterApp={() => setShowLanding(false)} />
+  return <AppMain />
+}
+
+// ── Main app ───────────────────────────────────────────────────────────────────
+function AppMain() {
   const { address, isConnected } = useAccount()
   const chainId = useChainId()
   const { switchChainAsync } = useSwitchChain()
