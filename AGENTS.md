@@ -8,7 +8,14 @@ This is the **project memory** - what Arc Studio remembers about building this a
 
 ## What This App Does
 
-BachatPay is a trustless onchain API gateway on Arc. Any wallet (or AI agent) pays $0.10 USDC to register a request onchain. The NanoPayGateway contract emits a `CallPaid(caller, callId, amount, requestData)` event that any off-chain service can listen to and fulfil — software-to-software micropayments with zero API keys required.
+BachatPay is a USDC payments app on Arc — like GPay but onchain. It includes a pay/receive flow, goal-based savings vaults, and onchain ROSCA group savings (chit funds).
+
+## Arc Mainnet Contracts
+| Contract | Address |
+|---|---|
+| NanoPayGateway | 0xa5d6C4a683d18a0f38CB68eC5345B95a17DEf306 |
+| BachatVault | 0x268c18C0367b1Bafc81C53f3C3EBA81C321ec130 |
+| ChitFund | 0x18129a7d1F97e4BDda369AF67925e63B01536bF9 |
 
 ## Tech Stack
 
