@@ -743,8 +743,14 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 </div>
               </>
             ) : (
-              <div className="py-8">
-                <p className="text-sm mb-4" style={{ color:'#6b7c99' }}>Connect your wallet to show your QR code</p>
+              <div className="py-12 flex flex-col items-center gap-4">
+                <div className="flex size-16 items-center justify-center rounded-full" style={{ background:'linear-gradient(135deg,#3b82f6,#8b5cf6)' }}>
+                  <QrCode size={28} color="white" />
+                </div>
+                <div>
+                  <p className="text-base font-semibold mb-1" style={{ color:'#0f1c35' }}>Your payment QR</p>
+                  <p className="text-sm" style={{ color:'#6b7c99' }}>Connect your wallet to generate your QR code</p>
+                </div>
                 <ConnectKitButton />
               </div>
             )}
