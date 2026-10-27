@@ -11,6 +11,21 @@ export default defineConfig({
     },
     dedupe: ['react', 'react-dom'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-core': ['react', 'react-dom', 'react/jsx-runtime'],
+          'wagmi-core': ['wagmi', 'viem', '@tanstack/react-query'],
+          'connectkit': ['connectkit'],
+          'circle-kit': ['@circle-fin/app-kit', '@circle-fin/bridge-kit', '@circle-fin/unified-balance-kit'],
+          'ui': ['lucide-react', 'sonner', 'framer-motion', 'clsx', 'tailwind-merge'],
+          'qr': ['qrcode.react', 'html5-qrcode'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
+  },
   optimizeDeps: {
     include: [
       'react',

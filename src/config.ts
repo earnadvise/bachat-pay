@@ -27,7 +27,7 @@ export const config = createConfig({
   chains: [arc, mainnet],
   connectors,
   transports: {
-    [arc.id]: http(),
-    [mainnet.id]: http(),
+    [arc.id]: http('https://rpc.mainnet.arc.io'),
+    [mainnet.id]: http('https://eth.llamarpc.com'),
   },
 })

@@ -23,8 +23,9 @@ import { TokenUSDC } from '@web3icons/react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { buildShareLink } from './lib/share'
-import VaultTab from './VaultTab'
-import ChitFundTab from './ChitFundTab'
+import { lazy, Suspense } from 'react'
+const VaultTab = lazy(() => import('./VaultTab'))
+const ChitFundTab = lazy(() => import('./ChitFundTab'))
 import { AppKit } from '@circle-fin/app-kit'
 import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2'
 import type { EIP1193Provider } from 'viem'
@@ -670,9 +671,28 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
             {address ? (
               <>
-                <div className="mx-auto mb-4 rounded-2xl p-4 inline-block" style={{ background:'white' }}>
+                <div className="mx-auto mb-3 rounded-2xl p-4 inline-block" style={{ background:'white' }}>
                   <QRCodeSVG value={shareLink || `https://bachat-pay.vercel.app/?to=${address}`} size={200} />
                 </div>
+
+                {/* Accepted networks */}
+                <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5">
+                  <span className="text-xs font-semibold" style={{ color:'#6b7c99' }}>Accepts USDC on:</span>
+                  {[
+                    { name: 'Arc', color: '#3b82f6' },
+                    { name: 'Base', color: '#0052ff' },
+                    { name: 'Ethereum', color: '#627eea' },
+                    { name: 'Arbitrum', color: '#28a0f0' },
+                    { name: 'Optimism', color: '#ff0420' },
+                    { name: 'Polygon', color: '#8247e5' },
+                  ].map(n => (
+                    <span key={n.name} className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: n.color + '18', color: n.color, border: `1px solid ${n.color}33` }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: n.color, display: 'inline-block' }} />
+                      {n.name}
+                    </span>
+                  ))}
+                </div>
+
                 <p className="text-xs font-mono mb-4 px-2 break-all" style={{ color:'#6b7c99' }}>{address}</p>
 
                 {/* Request amount */}
@@ -766,10 +786,10 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
         )}
 
         {/* ── VAULT TAB ── */}
-        {tab === 'vault' && <VaultTab toInr={toInr} />}
+        {tab === 'vault' && <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="animate-spin text-blue-500" size={32} /></div>}><VaultTab toInr={toInr} /></Suspense>}
 
         {/* ── CHIT FUND TAB ── */}
-        {tab === 'chit' && <ChitFundTab toInr={toInr} />}
+        {tab === 'chit' && <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="animate-spin text-blue-500" size={32} /></div>}><ChitFundTab toInr={toInr} /></Suspense>}
 
       </main>
 
