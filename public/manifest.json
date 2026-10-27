@@ -1,0 +1,42 @@
+{
+  "name": "BachatPay — USDC Payments on Arc",
+  "short_name": "BachatPay",
+  "description": "Daily USDC payments on Arc blockchain. Send, save, and split money with anyone — like GPay but onchain.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1c35",
+  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "categories": ["finance", "utilities"],
+  "lang": "en-IN",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Send USDC",
+      "short_name": "Send",
+      "description": "Send USDC to anyone",
+      "url": "/?tab=pay",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Receive",
+      "short_name": "Receive",
+      "description": "Show your payment QR code",
+      "url": "/?tab=receive",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }]
+    }
+  ]
+}
