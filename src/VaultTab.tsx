@@ -304,7 +304,7 @@ function VaultRow({ vaultId, toInr, writeContractAsync, explorer, chainId }: Vau
           <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: goalMet ? '#16a34a' : '#2563eb' }} />
         </div>
       )}
-      {!goalMet && (
+      {!goalMet && vault.balance > 0n && (
         <p className="text-xs" style={{ color: '#d97706' }}>Early withdrawal = 2% penalty · {toInr(parseFloat(balance) * 0.02)} goes to community pool</p>
       )}
       <button
