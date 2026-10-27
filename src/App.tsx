@@ -16,12 +16,14 @@ import { toast } from 'sonner'
 import {
   Send, QrCode, History, ArrowDownLeft, Star, StarOff,
   Copy, Share2, ExternalLink, Loader2, CheckCircle2, ScanLine,
-  Users, ChevronRight, Zap, X, Wallet,
+  Users, ChevronRight, Zap, X, Wallet, PiggyBank as PiggyBankIcon,
 } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { buildShareLink } from './lib/share'
+import VaultTab from './VaultTab'
+import ChitFundTab from './ChitFundTab'
 import { AppKit } from '@circle-fin/app-kit'
 import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2'
 import type { EIP1193Provider } from 'viem'
@@ -50,7 +52,7 @@ const glass = {
 
 const QUICK_AMOUNTS = ['1', '5', '10', '20', '50']
 
-type Tab = 'home' | 'pay' | 'receive' | 'history'
+type Tab = 'home' | 'pay' | 'receive' | 'history' | 'vault' | 'chit'
 
 interface HistoryEntry {
   hash: string
@@ -131,8 +133,37 @@ export default function App() {
   })
   const onArc = chainId === ARC_CHAIN_ID
   const balanceDisplay = usdcBalance != null
-    ? parseFloat(formatUnits(usdcBalance as bigint, USDC_DECIMALS)).toFixed(2)
+    ? parseFloat(formatUnits(usdcBalance, USDC_DECIMALS)).toFixed(2)
     : onArc ? '…' : '—'
+
+  // ── Live INR rate (CoinGecko, refreshes every 60s) ───────────────────────
+  const [inrRate, setInrRate] = useState<number>(96) // fallback to current rate
+  const [rateAge, setRateAge] = useState<string>('')
+  useEffect(() => {
+    let cancelled = false
+    const fetchRate = async () => {
+      try {
+        const res = await fetch(
+          'https://api.coingecko.com/api/v3/simple/price?ids=usd-coin&vs_currencies=inr',
+          { signal: AbortSignal.timeout(5000) }
+        )
+        const json = await res.json() as { 'usd-coin': { inr: number } }
+        if (!cancelled && json['usd-coin']?.inr) {
+          setInrRate(json['usd-coin'].inr)
+          setRateAge(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }))
+        }
+      } catch { /* keep fallback */ }
+    }
+    void fetchRate()
+    const id = setInterval(() => void fetchRate(), 60_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [])
+
+  const toInr = (usdc: string | number) => {
+    const n = typeof usdc === 'string' ? parseFloat(usdc) : usdc
+    if (isNaN(n)) return ''
+    return `₹${(n * inrRate).toFixed(2)}`
+  }
 
   // ── History & Favourites ──────────────────────────────────────────────────
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory)
@@ -187,7 +218,7 @@ export default function App() {
         address: USDC_ADDRESS,
         abi: erc20Abi,
         functionName: 'transfer',
-        args: [payTo as `0x${string}`, parseUnits(payAmount, USDC_DECIMALS)],
+        args: [payTo, parseUnits(payAmount, USDC_DECIMALS)],
         chainId: ARC_CHAIN_ID,
       })
       setPayHash(hash)
@@ -359,12 +390,22 @@ export default function App() {
             {/* Balance hero */}
             <div className="rounded-2xl p-5" style={glass.card}>
               <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color:'#6b7c99' }}>Your USDC Balance</p>
-              <div className="flex items-end gap-2 mb-4">
+              <div className="flex items-end gap-2 mb-1">
                 <span className="text-4xl font-bold tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:'#0f1c35' }}>
                   {!isConnected ? 'Connect wallet' : !onArc ? 'Switch chain' : `$${balanceDisplay}`}
                 </span>
-                {isConnected && onArc && <span className="mb-1 text-sm font-semibold" style={{ color:'#6b7c99' }}>USDC · Arc</span>}
+                {isConnected && onArc && <span className="mb-1 text-sm font-semibold" style={{ color:'#6b7c99' }}>USDC</span>}
               </div>
+              {isConnected && onArc && usdcBalance != null && (
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-lg font-semibold tabular-nums" style={{ color:'#16a34a' }}>
+                    {toInr(balanceDisplay)}
+                  </span>
+                  <span className="text-xs" style={{ color:'#6b7c99' }}>
+                    1 USDC = ₹{inrRate.toFixed(2)}{rateAge ? ` · ${rateAge}` : ''}
+                  </span>
+                </div>
+              )}
               {/* Action row */}
               <div className="grid grid-cols-4 gap-2">
                 {[
@@ -417,7 +458,7 @@ export default function App() {
                       </div>
                       <div className="flex-1 text-left">
                         <p className="text-sm font-semibold" style={{ color:'#0f1c35' }}>{shortAddr(h.to)}</p>
-                        <p className="text-xs" style={{ color:'#6b7c99' }}>${h.amount} USDC · {fmtDate(h.ts)}</p>
+                        <p className="text-xs" style={{ color:'#6b7c99' }}>${h.amount} USDC · {toInr(h.amount)} · {fmtDate(h.ts)}</p>
                       </div>
                       <ChevronRight size={14} style={{ color:'#6b7c99' }} />
                     </button>
@@ -459,7 +500,7 @@ export default function App() {
               <div className="text-center py-4">
                 <CheckCircle2 size={48} className="mx-auto mb-3" style={{ color:'#10b981' }} />
                 <p className="text-lg font-bold mb-1" style={{ color:'#0f1c35' }}>Sent!</p>
-                <p className="text-sm mb-4" style={{ color:'#6b7c99' }}>${payAmount} USDC to {shortAddr(payTo)}</p>
+                <p className="text-sm mb-4" style={{ color:'#6b7c99' }}>${payAmount} USDC {payAmount ? `(${toInr(payAmount)})` : ''} to {shortAddr(payTo)}</p>
                 <div className="flex gap-2 justify-center">
                   <a href={`${EXPLORER}/tx/${payHash}`} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1 rounded-xl px-4 py-2.5 text-sm font-semibold"
@@ -708,16 +749,25 @@ export default function App() {
             )}
           </div>
         )}
+
+        {/* ── VAULT TAB ── */}
+        {tab === 'vault' && <VaultTab toInr={toInr} />}
+
+        {/* ── CHIT FUND TAB ── */}
+        {tab === 'chit' && <ChitFundTab toInr={toInr} />}
+
       </main>
 
       {/* ── BOTTOM NAV ── */}
       <nav className="fixed bottom-0 inset-x-0 z-20 pb-safe-bottom" style={glass.card}>
         <div className="mx-auto max-w-md flex">
           {([
-            { id: 'home', icon: <Wallet size={22} />, label: 'Home' },
-            { id: 'pay', icon: <Send size={22} />, label: 'Pay' },
-            { id: 'receive', icon: <QrCode size={22} />, label: 'Receive' },
-            { id: 'history', icon: <History size={22} />, label: 'History' },
+            { id: 'home', icon: <Wallet size={18} />, label: 'Home' },
+            { id: 'pay', icon: <Send size={18} />, label: 'Pay' },
+            { id: 'receive', icon: <QrCode size={18} />, label: 'Receive' },
+            { id: 'vault', icon: <PiggyBankIcon size={18} />, label: 'Vault' },
+            { id: 'chit', icon: <Users size={18} />, label: 'Chit' },
+            { id: 'history', icon: <History size={18} />, label: 'History' },
           ] as { id: Tab; icon: React.ReactNode; label: string }[]).map(({ id, icon, label }) => (
             <button key={id} onClick={() => setTab(id)}
               className="flex flex-1 flex-col items-center gap-0.5 py-3 transition"
