@@ -112,6 +112,22 @@ function StatCard({ value, label }: { value: string; label: string }) {
 // ── Main landing page ──────────────────────────────────────────────────────────
 export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) {
   const [copied, setCopied] = useState<string | null>(null)
+  const [installPrompt, setInstallPrompt] = useState<Event | null>(null)
+  const [installed, setInstalled] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    window.addEventListener('appinstalled', () => setInstalled(true))
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  const handleInstall = () => {
+    if (!installPrompt) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    void (installPrompt as any).prompt()
+    setInstallPrompt(null)
+  }
 
   const copyAddr = (addr: string) => {
     void navigator.clipboard.writeText(addr)
@@ -220,6 +236,31 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) 
             >
               Launch App <ArrowRight size={18} />
             </button>
+            {installPrompt && !installed && (
+              <button
+                onClick={handleInstall}
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  color: '#fff',
+                  border: '1.5px solid rgba(255,255,255,0.4)',
+                  borderRadius: 16,
+                  padding: '16px 28px',
+                  fontSize: 16,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  backdropFilter: 'blur(8px)',
+                  fontFamily: 'Space Grotesk, sans-serif',
+                }}
+              >
+                Install App
+              </button>
+            )}
+            {installed && (
+              <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6, padding: '16px 20px' }}>
+                App installed
+              </span>
+            )}
             <a
               href={`${EXPLORER_URL}/address/${CONTRACTS[0].address}`}
               target="_blank" rel="noopener noreferrer"

@@ -2,15 +2,41 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="generator" content="Arc Studio by Circle — https://studio.arc.io" />
-    <title>BachatPay — Pay-Per-Call API Gateway on Arc</title>
+    <title>BachatPay — USDC Payments on Arc</title>
+    <meta name="description" content="Daily USDC payments on Arc blockchain. Send, save, and split money with anyone — like GPay but onchain." />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="BachatPay" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="BachatPay — USDC Payments on Arc" />
+    <meta property="og:description" content="Send, save, and split USDC with anyone. Like GPay but onchain on Arc." />
+    <meta property="og:type" content="website" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     />
+
+    <!-- Service Worker registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {})
+        })
+      }
+    </script>
   </head>
   <body>
     <!-- Built with Arc Studio — https://studio.arc.io -->
