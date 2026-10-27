@@ -118,11 +118,11 @@ export default function App() {
     !new URLSearchParams(window.location.search).get('to')
   )
   if (showLanding) return <LandingPage onEnterApp={() => setShowLanding(false)} />
-  return <AppMain />
+  return <AppMain onGoBack={() => setShowLanding(true)} />
 }
 
 // ── Main app ───────────────────────────────────────────────────────────────────
-function AppMain() {
+function AppMain({ onGoBack }: { onGoBack: () => void }) {
   const { address, isConnected } = useAccount()
   const chainId = useChainId()
   const { switchChainAsync } = useSwitchChain()
@@ -371,12 +371,17 @@ function AppMain() {
 
       {/* ── HEADER ── */}
       <header className="relative z-10 flex items-center justify-between px-4 pt-safe-top pb-3 pt-4" style={glass.card}>
-        <div className="flex items-center gap-2">
+        <button
+          onClick={onGoBack}
+          className="flex items-center gap-2 rounded-xl px-2 py-1 transition-opacity hover:opacity-70 active:opacity-50"
+          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+          title="Back to home"
+        >
           <div className="flex size-8 items-center justify-center rounded-full" style={{ background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)' }}>
             <TokenUSDC size={18} variant="branded" />
           </div>
           <span className="text-base font-bold tracking-tight" style={{ fontFamily:'Space Grotesk,sans-serif', color:'#0f1c35' }}>BachatPay</span>
-        </div>
+        </button>
         <ConnectKitButton />
       </header>
 
