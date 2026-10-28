@@ -143,6 +143,30 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) 
       overflowX: 'hidden',
     }}>
 
+      {/* ── MOBILE INSTALL BANNER ──────────────────────────────────────────── */}
+      {installPrompt && !installed && (
+        <div className="sm:hidden" style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 999,
+          background: 'linear-gradient(135deg,#1e3a8a,#4c1d95)',
+          padding: '14px 20px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          boxShadow: '0 -4px 24px rgba(30,58,138,0.3)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>₹</div>
+            <div>
+              <div style={{ color: 'white', fontWeight: 700, fontSize: 14, fontFamily: 'Space Grotesk,sans-serif' }}>Install BachatPay</div>
+              <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>Add to home screen — works like an app</div>
+            </div>
+          </div>
+          <button onClick={handleInstall} style={{
+            background: 'white', color: '#1d4ed8', border: 'none', borderRadius: 10,
+            padding: '8px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            fontFamily: 'Space Grotesk,sans-serif',
+          }}>Install</button>
+        </div>
+      )}
+
       {/* ── HERO ───────────────────────────────────────────────────────────── */}
       <section style={{
         position: 'relative',
@@ -516,7 +540,8 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) 
         fontSize: 13, color: '#9ca3af',
       }}>
         <TokenUSDC size={16} />
-        <span>BachatPay — Built with <a href="https://studio.arc.io" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}>Arc Studio</a> on Arc Mainnet</span>
+        <span className="hidden sm:inline">BachatPay — Built with <a href="https://studio.arc.io" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}>Arc Studio</a> on Arc Mainnet</span>
+        <span className="sm:hidden">BachatPay — USDC on Arc Mainnet</span>
       </footer>
 
       {/* ── CSS ANIMATIONS ─────────────────────────────────────────────────── */}
