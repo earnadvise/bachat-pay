@@ -290,6 +290,80 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
   const [receiveAmount, setReceiveAmount] = useState('')
   const [shareLink, setShareLink] = useState('')
   const [shopName, setShopName] = useState(() => localStorage.getItem('bachat_shopName') ?? '')
+  const qrCardRef = useRef<HTMLDivElement>(null)
+
+  const handleDownloadQR = useCallback(() => {
+    const svg = qrCardRef.current?.querySelector('svg')
+    if (!svg) return
+    const svgData = new XMLSerializer().serializeToString(svg)
+    const canvas = document.createElement('canvas')
+    const padding = 40
+    const size = 220
+    canvas.width = size + padding * 2
+    canvas.height = size + padding * 2 + (shopName ? 60 : 0) + 40
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    // Background
+    const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
+    grad.addColorStop(0, '#1e3a8a')
+    grad.addColorStop(1, '#1e1b4b')
+    ctx.fillStyle = grad
+    ctx.roundRect(0, 0, canvas.width, canvas.height, 20)
+    ctx.fill()
+    // Shop name
+    let yOffset = padding
+    if (shopName) {
+      ctx.font = `800 ${shopName.length > 20 ? 18 : 22}px "Space Grotesk", sans-serif`
+      ctx.textAlign = 'center'
+      ctx.fillStyle = '#93c5fd'
+      ctx.fillText(shopName, canvas.width / 2, yOffset + 36)
+      yOffset += 52
+    }
+    // QR white bg
+    ctx.fillStyle = 'white'
+    ctx.roundRect(padding, yOffset, size, size, 16)
+    ctx.fill()
+    // QR SVG onto canvas
+    const img = new Image()
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(svgBlob)
+    img.onload = () => {
+      ctx.drawImage(img, padding + 10, yOffset + 10, size - 20, size - 20)
+      URL.revokeObjectURL(url)
+      // Footer text
+      ctx.font = '500 12px "Space Grotesk", sans-serif'
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'
+      ctx.fillText('Scan to pay USDC on Arc · BachatPay', canvas.width / 2, yOffset + size + 24)
+      // Download
+      const a = document.createElement('a')
+      a.download = `${shopName || 'bachatpay'}-qr.png`
+      a.href = canvas.toDataURL('image/png')
+      a.click()
+    }
+    img.src = url
+  }, [shopName])
+
+  const handlePrintQR = useCallback(() => {
+    const card = qrCardRef.current
+    if (!card) return
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(`<html><head><title>BachatPay QR — ${shopName || 'Payment'}</title><style>
+      body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;font-family:'Space Grotesk',sans-serif;}
+      .card{padding:32px;border-radius:20px;background:linear-gradient(135deg,#1e3a8a,#1e1b4b);text-align:center;display:inline-block;}
+      .name{font-size:24px;font-weight:800;color:#93c5fd;margin-bottom:12px;}
+      .qr-wrap{background:white;border-radius:16px;padding:12px;display:inline-block;}
+      .footer{color:rgba(255,255,255,0.7);font-size:12px;margin-top:10px;}
+      @media print{body{background:#fff;}@page{margin:1cm;}}
+    </style></head><body><div class="card">
+      ${shopName ? `<div class="name">${shopName}</div>` : ''}
+      <div class="qr-wrap">${card.querySelector('svg')?.outerHTML ?? ''}</div>
+      <div class="footer">Scan to pay USDC on Arc · BachatPay</div>
+    </div></body></html>`)
+    win.document.close()
+    win.focus()
+    setTimeout(() => { win.print() }, 500)
+  }, [shopName])
 
   useEffect(() => {
     if (!address) return
@@ -709,7 +783,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                       {shopName}
                     </div>
                   )}
-                  <div className="rounded-2xl p-3 inline-block" style={{ background: 'white' }}>
+                  <div ref={qrCardRef} className="rounded-2xl p-3 inline-block" style={{ background: 'white' }}>
                     <QRCodeSVG value={shareLink || `https://arc-studio-7630b92000bb479e8ada5b05.vercel.app/?to=${address}`} size={180} />
                   </div>
                   <div style={{ marginTop: 10, color: 'rgba(255,255,255,0.7)', fontSize: 11, fontFamily: 'Space Grotesk,sans-serif' }}>
@@ -771,7 +845,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 mb-2">
                   <button onClick={() => { void navigator.clipboard.writeText(shareLink); toast.success('Link copied!') }}
                     className="flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-semibold"
                     style={{ background:'rgba(59,130,246,0.08)', color:'#1d4ed8' }}>
@@ -786,6 +860,19 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                     className="flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-semibold"
                     style={{ background:'rgba(37,211,102,0.1)', color:'#16a34a' }}>
                     <span className="text-lg leading-none">💬</span> WhatsApp
+                  </button>
+                </div>
+                {/* Download + Print */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={handleDownloadQR}
+                    className="flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold"
+                    style={{ background:'linear-gradient(135deg,#3b82f6,#8b5cf6)', color:'white' }}>
+                    <ExternalLink size={16} /> Download PNG
+                  </button>
+                  <button onClick={handlePrintQR}
+                    className="flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold"
+                    style={{ background:'rgba(59,130,246,0.1)', color:'#1d4ed8', border:'1.5px solid rgba(59,130,246,0.3)' }}>
+                    🖨️ Print
                   </button>
                 </div>
               </>
