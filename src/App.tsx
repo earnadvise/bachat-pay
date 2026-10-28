@@ -293,55 +293,65 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
   const qrCardRef = useRef<HTMLDivElement>(null)
 
   const handleDownloadQR = useCallback(() => {
-    const svg = qrCardRef.current?.querySelector('svg')
+    const card = qrCardRef.current
+    if (!card) return
+    const svg = card.querySelector('svg')
     if (!svg) return
     const svgData = new XMLSerializer().serializeToString(svg)
+    const W = 300, pad = 28
+    const nameH = shopName ? 56 : 0
+    const amtH = receiveAmount ? 32 : 0
+    const qSize = W - pad * 2
+    const H = pad + nameH + qSize + 32 + amtH + pad
     const canvas = document.createElement('canvas')
-    const padding = 40
-    const size = 220
-    canvas.width = size + padding * 2
-    canvas.height = size + padding * 2 + (shopName ? 60 : 0) + 40
+    canvas.width = W * 2; canvas.height = H * 2
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    // Background
-    const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
-    grad.addColorStop(0, '#1e3a8a')
-    grad.addColorStop(1, '#1e1b4b')
+    ctx.scale(2, 2)
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, W, H)
+    grad.addColorStop(0, '#1e3a8a'); grad.addColorStop(1, '#4c1d95')
     ctx.fillStyle = grad
-    ctx.roundRect(0, 0, canvas.width, canvas.height, 20)
-    ctx.fill()
+    ctx.beginPath(); ctx.roundRect(0, 0, W, H, 18); ctx.fill()
     // Shop name
-    let yOffset = padding
+    let y = pad
     if (shopName) {
-      ctx.font = `800 ${shopName.length > 20 ? 18 : 22}px "Space Grotesk", sans-serif`
       ctx.textAlign = 'center'
+      ctx.font = `800 ${shopName.length > 18 ? 17 : 21}px Arial, sans-serif`
       ctx.fillStyle = '#93c5fd'
-      ctx.fillText(shopName, canvas.width / 2, yOffset + 36)
-      yOffset += 52
+      ctx.fillText(shopName, W / 2, y + 30)
+      y += nameH
     }
-    // QR white bg
+    // White QR background
     ctx.fillStyle = 'white'
-    ctx.roundRect(padding, yOffset, size, size, 16)
-    ctx.fill()
-    // QR SVG onto canvas
+    ctx.beginPath(); ctx.roundRect(pad, y, qSize, qSize, 12); ctx.fill()
+    // Draw QR SVG
     const img = new Image()
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
-    const url = URL.createObjectURL(svgBlob)
+    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
     img.onload = () => {
-      ctx.drawImage(img, padding + 10, yOffset + 10, size - 20, size - 20)
+      ctx.drawImage(img, pad + 8, y + 8, qSize - 16, qSize - 16)
       URL.revokeObjectURL(url)
-      // Footer text
-      ctx.font = '500 12px "Space Grotesk", sans-serif'
-      ctx.fillStyle = 'rgba(255,255,255,0.7)'
-      ctx.fillText('Scan to pay USDC on Arc · BachatPay', canvas.width / 2, yOffset + size + 24)
-      // Download
+      y += qSize
+      // Footer
+      ctx.font = '500 11px Arial, sans-serif'
+      ctx.fillStyle = 'rgba(255,255,255,0.65)'
+      ctx.fillText('Scan to pay USDC on Arc · BachatPay', W / 2, y + 20)
+      y += 32
+      // Amount
+      if (receiveAmount) {
+        ctx.font = '700 14px Arial, sans-serif'
+        ctx.fillStyle = 'white'
+        ctx.fillText(`₹${(parseFloat(receiveAmount) * inrRate).toFixed(0)}  ·  $${receiveAmount} USDC`, W / 2, y + 16)
+      }
       const a = document.createElement('a')
-      a.download = `${shopName || 'bachatpay'}-qr.png`
+      a.download = `${shopName || 'bachatpay'}-payment-qr.png`
       a.href = canvas.toDataURL('image/png')
       a.click()
+      toast.success('QR downloaded!')
     }
     img.src = url
-  }, [shopName])
+  }, [shopName, receiveAmount, inrRate])
 
   const handlePrintQR = useCallback(() => {
     const card = qrCardRef.current
@@ -762,7 +772,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 </div>
 
                 {/* Merchant QR card */}
-                <div className="mx-auto mb-3 rounded-3xl overflow-hidden inline-block" style={{
+                <div ref={qrCardRef} className="mx-auto mb-3 rounded-3xl overflow-hidden inline-block" style={{
                   background: 'linear-gradient(135deg,#1e3a8a 0%,#4c1d95 100%)',
                   padding: '20px 24px 16px',
                   boxShadow: '0 8px 32px rgba(30,58,138,0.35)',
@@ -783,7 +793,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                       {shopName}
                     </div>
                   )}
-                  <div ref={qrCardRef} className="rounded-2xl p-3 inline-block" style={{ background: 'white' }}>
+                  <div className="rounded-2xl p-3 inline-block" style={{ background: 'white' }}>
                     <QRCodeSVG value={shareLink || `https://arc-studio-7630b92000bb479e8ada5b05.vercel.app/?to=${address}`} size={180} />
                   </div>
                   <div style={{ marginTop: 10, color: 'rgba(255,255,255,0.7)', fontSize: 11, fontFamily: 'Space Grotesk,sans-serif' }}>
