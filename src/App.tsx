@@ -289,6 +289,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
   // ── Receive / QR tab ──────────────────────────────────────────────────────
   const [receiveAmount, setReceiveAmount] = useState('')
   const [shareLink, setShareLink] = useState('')
+  const [shopName, setShopName] = useState(() => localStorage.getItem('bachat_shopName') ?? '')
 
   useEffect(() => {
     if (!address) return
@@ -671,8 +672,54 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
             {address ? (
               <>
-                <div className="mx-auto mb-3 rounded-2xl p-4 inline-block" style={{ background:'white' }}>
-                  <QRCodeSVG value={shareLink || `https://bachat-pay.vercel.app/?to=${address}`} size={200} />
+                {/* Shop name input */}
+                <div className="mb-4 text-left" style={glass.inner}>
+                  <div className="rounded-xl p-3">
+                    <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Shop / Your Name (optional)</label>
+                    <input
+                      value={shopName}
+                      onChange={e => { setShopName(e.target.value); localStorage.setItem('bachat_shopName', e.target.value) }}
+                      placeholder="e.g. Sharma Kirana Store"
+                      className="w-full bg-transparent text-base font-bold outline-none"
+                      style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}
+                      maxLength={40}
+                    />
+                  </div>
+                </div>
+
+                {/* Merchant QR card */}
+                <div className="mx-auto mb-3 rounded-3xl overflow-hidden inline-block" style={{
+                  background: 'linear-gradient(135deg,#1e3a8a 0%,#4c1d95 100%)',
+                  padding: '20px 24px 16px',
+                  boxShadow: '0 8px 32px rgba(30,58,138,0.35)',
+                  minWidth: 240,
+                }}>
+                  {shopName && (
+                    <div style={{
+                      fontFamily: 'Space Grotesk, sans-serif',
+                      fontWeight: 800,
+                      fontSize: shopName.length > 20 ? 18 : 22,
+                      letterSpacing: '-0.03em',
+                      background: 'linear-gradient(90deg,#93c5fd,#c4b5fd,#f9a8d4)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      marginBottom: 12,
+                      lineHeight: 1.2,
+                    }}>
+                      {shopName}
+                    </div>
+                  )}
+                  <div className="rounded-2xl p-3 inline-block" style={{ background: 'white' }}>
+                    <QRCodeSVG value={shareLink || `https://arc-studio-7630b92000bb479e8ada5b05.vercel.app/?to=${address}`} size={180} />
+                  </div>
+                  <div style={{ marginTop: 10, color: 'rgba(255,255,255,0.7)', fontSize: 11, fontFamily: 'Space Grotesk,sans-serif' }}>
+                    Scan to pay USDC on Arc
+                  </div>
+                  {receiveAmount && (
+                    <div style={{ marginTop: 4, color: 'white', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk,sans-serif' }}>
+                      ₹{(parseFloat(receiveAmount) * inrRate).toFixed(0)} · ${receiveAmount} USDC
+                    </div>
+                  )}
                 </div>
 
                 {/* Accepted networks */}
