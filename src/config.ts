@@ -21,7 +21,7 @@ export const config = createConfig({
     injected({ shimDisconnect: true }),
     walletConnect({
       projectId: WC_PROJECT_ID,
-      showQrModal: true,
+      showQrModal: false,
       metadata: {
         name: 'BachatPay',
         description: 'USDC payments on Arc — like GPay but onchain',
