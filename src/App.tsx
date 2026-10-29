@@ -367,6 +367,11 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
     setScanning(false)
   }, [])
 
+  // Stop scanner when wallet connects (QR overlay would otherwise persist)
+  useEffect(() => {
+    if (isConnected && scanning) stopScan()
+  }, [isConnected, scanning, stopScan])
+
   // ── Receive / QR tab ──────────────────────────────────────────────────────
   const [receiveAmount, setReceiveAmount] = useState('')
   const [shareLink, setShareLink] = useState('')
@@ -689,13 +694,12 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
               <ChevronRight size={16} style={{ color:textMuted }} />
             </button>
 
-            {/* Connect prompt */}
+            {/* Connect prompt — wallet button is already in the header; just show a hint */}
             {!isConnected && (
               <div className="rounded-2xl p-5 text-center" style={cardStyle}>
                 <Wallet size={32} className="mx-auto mb-2" style={{ color:'#3b82f6' }} />
                 <p className="font-semibold mb-1" style={{ color:textMain }}>Connect your wallet</p>
-                <p className="text-sm mb-3" style={{ color:textMuted }}>Use MetaMask, Coinbase Wallet, or scan with your phone</p>
-                <ConnectKitButton />
+                <p className="text-sm" style={{ color:textMuted }}>Tap "Connect Wallet" in the top-right corner to get started</p>
               </div>
             )}
           </>
