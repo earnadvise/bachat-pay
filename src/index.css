@@ -34,3 +34,46 @@ body {
 
 .display { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.03em; }
 .mono { font-family: 'JetBrains Mono', Menlo, monospace; }
+
+/* ── BachatPay global polish ────────────────────────────────────────────── */
+@keyframes bp-glow-pulse {
+  0%,100% { box-shadow: 0 4px 24px rgba(29,78,216,0.35), 0 0 0 0 rgba(29,78,216,0.25); }
+  50%      { box-shadow: 0 8px 40px rgba(29,78,216,0.55), 0 0 0 8px rgba(29,78,216,0); }
+}
+@keyframes bp-balance-in {
+  from { opacity:0; transform: scale(0.92) translateY(6px); }
+  to   { opacity:1; transform: scale(1)    translateY(0);   }
+}
+@keyframes bp-slide-up {
+  from { opacity:0; transform: translateY(16px); }
+  to   { opacity:1; transform: translateY(0);    }
+}
+@keyframes bp-tab-dot {
+  0%,100% { transform: scaleX(1); }
+  50%      { transform: scaleX(1.5); }
+}
+
+/* Pay button glow */
+.bp-pay-btn {
+  background: linear-gradient(135deg,#1d4ed8,#7c3aed) !important;
+  animation: bp-glow-pulse 3s ease-in-out infinite;
+  transition: transform 0.15s ease, opacity 0.15s ease !important;
+}
+.bp-pay-btn:not(:disabled):active { transform: scale(0.97) !important; }
+.bp-pay-btn:disabled { animation: none !important; }
+
+/* Balance number entrance */
+.bp-balance { animation: bp-balance-in 0.5s ease forwards; }
+
+/* Card entrance */
+.bp-card-in { animation: bp-slide-up 0.4s ease forwards; }
+
+/* Active nav dot pulse */
+.bp-nav-dot { animation: bp-tab-dot 2s ease-in-out infinite; }
+
+/* Input focus glow */
+.bp-input:focus { box-shadow: 0 0 0 3px rgba(59,130,246,0.25) !important; outline: none; }
+
+/* Smooth all transitions */
+button { transition: opacity 0.15s ease, transform 0.15s ease; }
+button:active { opacity: 0.85; }

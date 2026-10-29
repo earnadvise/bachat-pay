@@ -595,7 +595,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                   )}
                 </div>
                 <div className="flex items-end gap-2">
-                  <span className="text-5xl font-bold tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:'white', letterSpacing:'-0.03em' }}>
+                  <span className="bp-balance text-5xl font-bold tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:'white', letterSpacing:'-0.03em' }}>
                     {!isConnected ? '—' : !onArc ? '—' : `$${balanceDisplay}`}
                   </span>
                 </div>
@@ -811,7 +811,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                           placeholder="0"
                           type="number"
                           inputMode="decimal"
-                          className="w-full bg-transparent text-2xl font-bold outline-none tabular-nums"
+                          className="bp-input w-full bg-transparent text-2xl font-bold outline-none tabular-nums"
                           style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}
                         />
                         {payAmount && parseFloat(payAmount) > 0 && (
@@ -826,7 +826,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                           placeholder="0.00"
                           type="number"
                           inputMode="decimal"
-                          className="w-full bg-transparent text-2xl font-bold outline-none tabular-nums"
+                          className="bp-input w-full bg-transparent text-2xl font-bold outline-none tabular-nums"
                           style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}
                         />
                         {payAmount && parseFloat(payAmount) > 0 && (
@@ -897,8 +897,8 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 <button
                   onClick={() => void handlePay()}
                   disabled={!isConnected || !onArc || !isAddress(payTo) || !payAmount || payStep === 'sending'}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white transition active:scale-95 disabled:opacity-50"
-                  style={{ background:'linear-gradient(135deg,#1d4ed8,#7c3aed)', minHeight:56 }}>
+                  className="bp-pay-btn flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white disabled:opacity-50"
+                  style={{ minHeight:56 }}>
                   {payStep === 'sending'
                     ? <><Loader2 size={18} className="animate-spin" /> Sending…</>
                     : <><Send size={18} /> Pay {payAmount ? `$${payAmount}` : ''} USDC</>}
@@ -1135,7 +1135,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
               style={{ color: tab === id ? '#3b82f6' : (dk ? '#4a6080' : '#9ca3af'), minHeight: 60 }}>
               {icon}
               <span className="text-xs font-semibold">{label}</span>
-              {tab === id && <div className="h-0.5 w-6 rounded-full mt-0.5" style={{ background:'#1d4ed8' }} />}
+              {tab === id && <div className="bp-nav-dot h-0.5 w-6 rounded-full mt-0.5" style={{ background:'linear-gradient(90deg,#3b82f6,#8b5cf6)' }} />}
             </button>
           ))}
         </div>
