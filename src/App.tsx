@@ -18,6 +18,7 @@ import {
   Send, QrCode, History, ArrowDownLeft, Star, StarOff,
   Copy, Share2, ExternalLink, Loader2, CheckCircle2, ScanLine,
   Users, ChevronRight, Zap, X, Wallet, PiggyBank as PiggyBankIcon,
+  BookUser, Trash2, TrendingUp, TrendingDown, ArrowUpRight,
 } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { QRCodeSVG } from 'qrcode.react'
@@ -55,7 +56,7 @@ const glass = {
 
 const QUICK_AMOUNTS = ['1', '5', '10', '20', '50']
 
-type Tab = 'home' | 'pay' | 'receive' | 'history' | 'vault' | 'chit'
+type Tab = 'home' | 'pay' | 'receive' | 'history' | 'vault' | 'chit' | 'contacts'
 
 interface HistoryEntry {
   hash: string
@@ -69,6 +70,12 @@ interface HistoryEntry {
 interface Favourite {
   address: string
   name: string
+}
+
+interface Contact {
+  address: string
+  name: string
+  emoji?: string
 }
 
 // ── Bridge helpers ─────────────────────────────────────────────────────────────
@@ -105,6 +112,16 @@ function loadHistory(): HistoryEntry[] {
 }
 function loadFavourites(): Favourite[] {
   try { return JSON.parse(localStorage.getItem('bachat_favs') ?? '[]') as Favourite[] } catch { return [] }
+}
+function loadContacts(): Contact[] {
+  try { return JSON.parse(localStorage.getItem('bachat_contacts') ?? '[]') as Contact[] } catch { return [] }
+}
+function resolveLabel(addr: string, contacts: Contact[], favs: Favourite[]): string {
+  const c = contacts.find(x => x.address.toLowerCase() === addr.toLowerCase())
+  if (c) return (c.emoji ? c.emoji + ' ' : '') + c.name
+  const f = favs.find(x => x.address.toLowerCase() === addr.toLowerCase())
+  if (f) return f.name
+  return shortAddr(addr)
 }
 
 function shortAddr(addr: string) {
@@ -205,6 +222,34 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
   // ── Dark mode ──────────────────────────────────────────────────────────────
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('bachat_dark') === '1')
   const toggleDark = () => setDarkMode(d => { localStorage.setItem('bachat_dark', d ? '0' : '1'); return !d })
+
+  // ── Onboarding ────────────────────────────────────────────────────────────
+  const [onboardStep, setOnboardStep] = useState<0|1|2|3>(() =>
+    localStorage.getItem('bachat_onboarded') === '1' ? 0 : 1
+  )
+  const dismissOnboard = () => { localStorage.setItem('bachat_onboarded', '1'); setOnboardStep(0) }
+
+  // ── Contacts book ─────────────────────────────────────────────────────────
+  const [contacts, setContacts] = useState<Contact[]>(loadContacts)
+  const [showContacts, setShowContacts] = useState(false)
+  const [newContactAddr, setNewContactAddr] = useState('')
+  const [newContactName, setNewContactName] = useState('')
+  const [newContactEmoji, setNewContactEmoji] = useState('')
+
+  const saveContact = useCallback((c: Contact) => {
+    setContacts(prev => {
+      const next = [c, ...prev.filter(x => x.address.toLowerCase() !== c.address.toLowerCase())]
+      localStorage.setItem('bachat_contacts', JSON.stringify(next))
+      return next
+    })
+  }, [])
+  const deleteContact = useCallback((addr: string) => {
+    setContacts(prev => {
+      const next = prev.filter(x => x.address.toLowerCase() !== addr.toLowerCase())
+      localStorage.setItem('bachat_contacts', JSON.stringify(next))
+      return next
+    })
+  }, [])
 
   // ── Onchain history from Arc explorer ─────────────────────────────────────
   const [onchainHistory, setOnchainHistory] = useState<HistoryEntry[]>([])
@@ -533,6 +578,13 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
     history.filter(h => h.dir === 'out').map(h => [h.to, h])
   ).values()].slice(0, 5)
 
+  // ── Spending summary (7-day) ──────────────────────────────────────────────
+  const weekAgo = Date.now() - 7 * 24 * 3600_000
+  const weekEntries = mergedHistory.filter(h => h.ts >= weekAgo)
+  const weekSent = weekEntries.filter(h => h.dir === 'out').reduce((s, h) => s + parseFloat(h.amount), 0)
+  const weekReceived = weekEntries.filter(h => h.dir === 'in').reduce((s, h) => s + parseFloat(h.amount), 0)
+  const weekTxCount = weekEntries.length
+
   const dk = darkMode
   const bg = dk ? { background: 'linear-gradient(160deg,#0f1c35 0%,#1a0a2e 50%,#0d1a2e 100%)' } : { background: 'linear-gradient(160deg,#f0f7ff 0%,#fffdf7 50%,#f7f0ff 100%)' }
   const cardStyle = dk ? { background:'rgba(255,255,255,0.06)', backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.10)', boxShadow:'0 8px 32px rgba(0,0,0,0.4)' } as React.CSSProperties : glass.card
@@ -670,7 +722,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                         {h.to.slice(2, 4).toUpperCase()}
                       </div>
                       <div className="flex-1 text-left">
-                        <p className="text-sm font-semibold" style={{ color:textMain }}>{shortAddr(h.to)}</p>
+                        <p className="text-sm font-semibold" style={{ color:textMain }}>{resolveLabel(h.to, contacts, favs)}</p>
                         <p className="text-xs" style={{ color:textMuted }}>${h.amount} USDC · {toInr(h.amount)} · {fmtDate(h.ts)}</p>
                       </div>
                       <ChevronRight size={14} style={{ color:textMuted }} />
@@ -694,7 +746,47 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
               <ChevronRight size={16} style={{ color:textMuted }} />
             </button>
 
-            {/* Connect prompt — wallet button is already in the header; just show a hint */}
+            {/* Weekly spending summary */}
+            {isConnected && weekTxCount > 0 && (
+              <div className="rounded-2xl p-4" style={cardStyle}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color:textMuted }}>This Week</p>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>{weekTxCount} txn{weekTxCount !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl p-3" style={{ background:'rgba(239,68,68,0.07)', border:'1px solid rgba(239,68,68,0.12)' }}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <TrendingDown size={14} style={{ color:'#dc2626' }} />
+                      <span className="text-xs font-semibold" style={{ color:'#dc2626' }}>Sent</span>
+                    </div>
+                    <p className="text-lg font-bold tabular-nums" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>${weekSent.toFixed(2)}</p>
+                    <p className="text-xs mt-0.5" style={{ color:textMuted }}>{toInr(weekSent)}</p>
+                  </div>
+                  <div className="rounded-xl p-3" style={{ background:'rgba(16,185,129,0.07)', border:'1px solid rgba(16,185,129,0.12)' }}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <TrendingUp size={14} style={{ color:'#059669' }} />
+                      <span className="text-xs font-semibold" style={{ color:'#059669' }}>Received</span>
+                    </div>
+                    <p className="text-lg font-bold tabular-nums" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>${weekReceived.toFixed(2)}</p>
+                    <p className="text-xs mt-0.5" style={{ color:textMuted }}>{toInr(weekReceived)}</p>
+                  </div>
+                </div>
+                {weekSent > 0 && weekReceived > 0 && (
+                  <div className="mt-3">
+                    <div className="flex justify-between text-xs mb-1" style={{ color:textMuted }}>
+                      <span>Net</span>
+                      <span style={{ color: weekReceived >= weekSent ? '#059669' : '#dc2626', fontWeight:600 }}>
+                        {weekReceived >= weekSent ? '+' : '-'}${Math.abs(weekReceived - weekSent).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="rounded-full overflow-hidden h-1.5" style={{ background: dk ? 'rgba(255,255,255,0.1)' : '#e5e7eb' }}>
+                      <div className="h-full rounded-full" style={{ width:`${Math.min(100, (weekSent / (weekSent + weekReceived)) * 100).toFixed(0)}%`, background:'linear-gradient(90deg,#dc2626,#f97316)' }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {!isConnected && (
               <div className="rounded-2xl p-5 text-center" style={cardStyle}>
                 <Wallet size={32} className="mx-auto mb-2" style={{ color:'#3b82f6' }} />
@@ -712,7 +804,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
               <div className="text-center py-4">
                 <CheckCircle2 size={48} className="mx-auto mb-3" style={{ color:'#10b981' }} />
                 <p className="text-lg font-bold mb-1" style={{ color:textMain }}>Sent!</p>
-                <p className="text-sm mb-4" style={{ color:textMuted }}>${payAmount} USDC {payAmount ? `(${toInr(payAmount)})` : ''} to {shortAddr(payTo)}</p>
+                <p className="text-sm mb-4" style={{ color:textMuted }}>${payAmount} USDC {payAmount ? `(${toInr(payAmount)})` : ''} to {resolveLabel(payTo, contacts, favs)}</p>
                 <div className="flex gap-2 justify-center">
                   <a href={`${EXPLORER}/tx/${payHash}`} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1 rounded-xl px-4 py-2.5 text-sm font-semibold"
@@ -787,7 +879,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                             <button key={a} onClick={() => setPayTo(a)}
                               className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold"
                               style={{ background:'rgba(59,130,246,0.10)', color:'#1d4ed8' }}>
-                              {shortAddr(a)}
+                              {resolveLabel(a, contacts, favs)}
                             </button>
                           ))}
                         </div>
@@ -1096,7 +1188,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate" style={{ color:textMain }}>
-                        {h.dir === 'out' ? `To ${shortAddr(h.to)}` : `From ${shortAddr(h.to)}`}
+                        {h.dir === 'out' ? `To ${resolveLabel(h.to, contacts, favs)}` : `From ${resolveLabel(h.to, contacts, favs)}`}
                       </p>
                       <p className="text-xs truncate" style={{ color:textMuted }}>
                         {h.note || 'USDC transfer'} · {fmtDate(h.ts)}
@@ -1112,6 +1204,122 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── CONTACTS TAB ── */}
+        {tab === 'contacts' && (
+          <div className="space-y-3">
+            {/* Add contact form */}
+            <div className="rounded-2xl p-4" style={cardStyle}>
+              <h2 className="font-bold text-base mb-3" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Add Contact</h2>
+              <div className="space-y-2">
+                <div className="rounded-xl p-3" style={innerStyle}>
+                  <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>Wallet Address</label>
+                  <input
+                    value={newContactAddr}
+                    onChange={e => setNewContactAddr(e.target.value)}
+                    placeholder="0x…"
+                    className="bp-input w-full bg-transparent text-sm font-mono outline-none"
+                    style={{ color:textMain }}
+                  />
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="col-span-3 rounded-xl p-3" style={innerStyle}>
+                    <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>Name</label>
+                    <input
+                      value={newContactName}
+                      onChange={e => setNewContactName(e.target.value)}
+                      placeholder="Sharma Ji, Rohit…"
+                      className="bp-input w-full bg-transparent text-sm outline-none"
+                      style={{ color:textMain }}
+                    />
+                  </div>
+                  <div className="rounded-xl p-3" style={innerStyle}>
+                    <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>Icon</label>
+                    <input
+                      value={newContactEmoji}
+                      onChange={e => setNewContactEmoji(e.target.value)}
+                      placeholder="🏪"
+                      className="w-full bg-transparent text-lg outline-none text-center"
+                      style={{ color:textMain }}
+                      maxLength={2}
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!isAddress(newContactAddr) || !newContactName.trim()) {
+                      toast.error('Enter a valid address and name')
+                      return
+                    }
+                    saveContact({ address: newContactAddr, name: newContactName.trim(), emoji: newContactEmoji.trim() || undefined })
+                    setNewContactAddr(''); setNewContactName(''); setNewContactEmoji('')
+                    toast.success('Contact saved!')
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white"
+                  style={{ background:'linear-gradient(135deg,#1d4ed8,#7c3aed)' }}
+                >
+                  <BookUser size={16} /> Save Contact
+                </button>
+              </div>
+            </div>
+
+            {/* Contacts list */}
+            <div className="rounded-2xl p-4" style={cardStyle}>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-bold text-base" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>
+                  Saved Contacts
+                </h2>
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>{contacts.length}</span>
+              </div>
+              {contacts.length === 0 ? (
+                <div className="py-10 text-center">
+                  <BookUser size={40} className="mx-auto mb-3 opacity-30" style={{ color:textMuted }} />
+                  <p className="text-sm font-semibold mb-1" style={{ color:textMain }}>No contacts yet</p>
+                  <p className="text-xs" style={{ color:textMuted }}>Add a wallet address above to save someone as a contact</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {contacts.map(c => (
+                    <div key={c.address} className="flex items-center gap-3 rounded-xl px-3 py-3"
+                      style={{ background: dk ? 'rgba(255,255,255,0.06)' : 'rgba(59,130,246,0.04)', border:`1px solid ${dk ? 'rgba(255,255,255,0.08)' : 'rgba(59,130,246,0.1)'}` }}>
+                      <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-full text-lg"
+                        style={{ background:'linear-gradient(135deg,#3b82f6,#8b5cf6)' }}>
+                        {c.emoji || <span className="text-white text-sm font-bold">{c.name.slice(0,1).toUpperCase()}</span>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold" style={{ color:textMain }}>{c.name}</p>
+                        <p className="text-xs font-mono truncate" style={{ color:textMuted }}>{c.address.slice(0,10)}…{c.address.slice(-6)}</p>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => { setPayTo(c.address); setTab('pay') }}
+                          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold"
+                          style={{ background:'rgba(29,78,216,0.1)', color:'#1d4ed8' }}
+                        >
+                          <ArrowUpRight size={12} /> Pay
+                        </button>
+                        <button
+                          onClick={() => { void navigator.clipboard.writeText(c.address); toast.success('Address copied!') }}
+                          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold"
+                          style={{ background:'rgba(59,130,246,0.08)', color:'#6b7c99' }}
+                        >
+                          <Copy size={12} />
+                        </button>
+                        <button
+                          onClick={() => { deleteContact(c.address); toast.success('Contact removed') }}
+                          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold"
+                          style={{ background:'rgba(239,68,68,0.08)', color:'#dc2626' }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1133,6 +1341,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
             { id: 'vault', icon: <PiggyBankIcon size={18} />, label: 'Vault' },
             { id: 'chit', icon: <Users size={18} />, label: 'Chit' },
             { id: 'history', icon: <History size={18} />, label: 'History' },
+            { id: 'contacts', icon: <BookUser size={18} />, label: 'Contacts' },
           ] as { id: Tab; icon: React.ReactNode; label: string }[]).map(({ id, icon, label }) => (
             <button key={id} onClick={() => setTab(id)}
               className="flex flex-1 flex-col items-center gap-0.5 py-3 transition"
@@ -1193,6 +1402,73 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 <span>💬</span> WhatsApp
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ONBOARDING OVERLAY ── */}
+      {onboardStep > 0 && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background:'rgba(0,0,0,0.65)', backdropFilter:'blur(6px)' }}>
+          <div className="w-full max-w-md rounded-t-3xl p-6 pb-10" style={{ ...cardStyle, background: dk ? 'rgba(15,28,53,0.97)' : 'rgba(255,255,255,0.97)' }}>
+            {/* Step dots */}
+            <div className="flex justify-center gap-2 mb-6">
+              {[1,2,3].map(s => (
+                <div key={s} className="h-1.5 rounded-full transition-all" style={{ width: s === onboardStep ? 24 : 8, background: s === onboardStep ? '#3b82f6' : (dk ? 'rgba(255,255,255,0.2)' : '#d1d5db') }} />
+              ))}
+            </div>
+
+            {onboardStep === 1 && (
+              <>
+                <div className="flex size-16 items-center justify-center rounded-2xl mx-auto mb-4" style={{ background:'linear-gradient(135deg,#1d4ed8,#7c3aed)' }}>
+                  <Wallet size={32} color="white" />
+                </div>
+                <h3 className="text-xl font-bold text-center mb-2" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Welcome to BachatPay</h3>
+                <p className="text-sm text-center mb-6 leading-relaxed" style={{ color:textMuted }}>India's first USDC payments app on Arc. Send money like GPay — but onchain, instant, and with near-zero fees.</p>
+                <button onClick={() => setOnboardStep(2)} className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white" style={{ background:'linear-gradient(135deg,#1d4ed8,#7c3aed)' }}>
+                  Get Started <ChevronRight size={18} />
+                </button>
+              </>
+            )}
+            {onboardStep === 2 && (
+              <>
+                <div className="flex size-16 items-center justify-center rounded-2xl mx-auto mb-4" style={{ background:'linear-gradient(135deg,#0891b2,#0e7490)' }}>
+                  <TokenUSDC size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-center mb-2" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Connect your wallet</h3>
+                <p className="text-sm text-center mb-3 leading-relaxed" style={{ color:textMuted }}>Tap <strong style={{color:textMain}}>Connect Wallet</strong> in the top-right corner. Use MetaMask, Coinbase Wallet, or WalletConnect. Make sure you're on <strong style={{color:'#3b82f6'}}>Arc mainnet</strong> — gas fees are paid in USDC.</p>
+                <div className="rounded-xl p-3 mb-6 text-center" style={{ background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)' }}>
+                  <p className="text-xs font-semibold" style={{ color:'#1d4ed8' }}>Need USDC on Arc? Bridge from Base, Arbitrum, or Ethereum using the Bridge button on the home screen.</p>
+                </div>
+                <button onClick={() => setOnboardStep(3)} className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white" style={{ background:'linear-gradient(135deg,#0891b2,#0e7490)' }}>
+                  Next <ChevronRight size={18} />
+                </button>
+              </>
+            )}
+            {onboardStep === 3 && (
+              <>
+                <div className="flex size-16 items-center justify-center rounded-2xl mx-auto mb-4" style={{ background:'linear-gradient(135deg,#16a34a,#15803d)' }}>
+                  <Send size={32} color="white" />
+                </div>
+                <h3 className="text-xl font-bold text-center mb-2" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Pay anyone instantly</h3>
+                <p className="text-sm text-center mb-4 leading-relaxed" style={{ color:textMuted }}>Tap <strong style={{color:textMain}}>Pay</strong> to send USDC by address or QR scan. Tap <strong style={{color:textMain}}>Receive</strong> to generate your merchant QR. Save contacts for quick payments.</p>
+                <div className="grid grid-cols-3 gap-2 mb-6">
+                  {[
+                    { icon: <QrCode size={18} />, label: 'Scan QR', color:'#1d4ed8' },
+                    { icon: <PiggyBankIcon size={18} />, label: 'Save in Vault', color:'#16a34a' },
+                    { icon: <Users size={18} />, label: 'Chit Fund', color:'#7c3aed' },
+                  ].map(({ icon, label, color }) => (
+                    <div key={label} className="rounded-xl p-3 text-center" style={{ background:`${color}12`, border:`1px solid ${color}22` }}>
+                      <div className="flex justify-center mb-1" style={{ color }}>{icon}</div>
+                      <p className="text-xs font-semibold" style={{ color }}>{label}</p>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={dismissOnboard} className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white" style={{ background:'linear-gradient(135deg,#16a34a,#15803d)' }}>
+                  Let's go!
+                </button>
+              </>
+            )}
+            <button onClick={dismissOnboard} className="w-full mt-3 text-xs text-center" style={{ color:textMuted, background:'none', border:'none', cursor:'pointer' }}>Skip</button>
           </div>
         </div>
       )}
