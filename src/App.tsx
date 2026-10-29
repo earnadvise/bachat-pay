@@ -249,9 +249,10 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
       const prev: string[] = JSON.parse(localStorage.getItem(key) ?? '[]') as string[]
       const next = [addr, ...prev.filter(a => a !== addr)].slice(0, 8)
       localStorage.setItem(key, JSON.stringify(next))
+      setRecentAddrs(next)
     } catch { /* ignore */ }
   }, [])
-  const [recentAddrs] = useState<string[]>(() => {
+  const [recentAddrs, setRecentAddrs] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('bachat_recents') ?? '[]') as string[] } catch { return [] }
   })
 
@@ -581,37 +582,51 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
             )}
 
             {/* Balance hero */}
-            <div className="rounded-2xl p-5" style={cardStyle}>
-              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color:textMuted }}>Your USDC Balance</p>
-              <div className="flex items-end gap-2 mb-1">
-                <span className="text-4xl font-bold tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:textMain }}>
-                  {!isConnected ? 'Connect wallet' : !onArc ? 'Switch chain' : `$${balanceDisplay}`}
-                </span>
-                {isConnected && onArc && <span className="mb-1 text-sm font-semibold" style={{ color:textMuted }}>USDC</span>}
-              </div>
-              {isConnected && onArc && usdcBalance != null && (
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-lg font-semibold tabular-nums" style={{ color:'#16a34a' }}>
-                    {toInr(balanceDisplay)}
-                  </span>
-                  <span className="text-xs" style={{ color:textMuted }}>
-                    1 USDC = ₹{inrRate.toFixed(2)}{rateAge ? ` · ${rateAge}` : ''}
+            <div className="rounded-3xl overflow-hidden" style={{ ...cardStyle, padding: 0 }}>
+              {/* Top gradient strip */}
+              <div style={{ background: 'linear-gradient(135deg,#1d4ed8 0%,#7c3aed 100%)', padding: '20px 20px 28px' }}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <TokenUSDC size={20} variant="branded" />
+                    <span className="text-xs font-bold tracking-widest uppercase" style={{ color:'rgba(255,255,255,0.7)' }}>USDC Balance</span>
+                  </div>
+                  {isConnected && onArc && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background:'rgba(255,255,255,0.15)', color:'white' }}>Arc Mainnet</span>
+                  )}
+                </div>
+                <div className="flex items-end gap-2">
+                  <span className="text-5xl font-bold tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:'white', letterSpacing:'-0.03em' }}>
+                    {!isConnected ? '—' : !onArc ? '—' : `$${balanceDisplay}`}
                   </span>
                 </div>
-              )}
+                {isConnected && onArc && usdcBalance != null && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-base font-semibold tabular-nums" style={{ color:'rgba(255,255,255,0.85)' }}>
+                      {toInr(balanceDisplay)}
+                    </span>
+                    <span className="text-xs" style={{ color:'rgba(255,255,255,0.5)' }}>
+                      1 USDC = ₹{inrRate.toFixed(2)}{rateAge ? ` · ${rateAge}` : ''}
+                    </span>
+                  </div>
+                )}
+                {!isConnected && (
+                  <p className="text-sm mt-1" style={{ color:'rgba(255,255,255,0.6)' }}>Connect wallet to see balance</p>
+                )}
+              </div>
               {/* Action row */}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-0 p-3" style={{ background: dk ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.6)' }}>
                 {[
-                  { icon: <Send size={20} />, label: 'Send', action: () => setTab('pay') },
-                  { icon: <QrCode size={20} />, label: 'Receive', action: () => setTab('receive') },
-                  { icon: <ScanLine size={20} />, label: 'Scan', action: () => void startScan() },
-                  { icon: <Zap size={20} />, label: 'Bridge', action: () => setShowBridge(true) },
-                ].map(({ icon, label, action }) => (
+                  { icon: <Send size={18} />, label: 'Send', action: () => setTab('pay'), color: '#3b82f6', bg: 'rgba(59,130,246,0.12)' },
+                  { icon: <QrCode size={18} />, label: 'Receive', action: () => setTab('receive'), color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
+                  { icon: <ScanLine size={18} />, label: 'Scan', action: () => void startScan(), color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+                  { icon: <Zap size={18} />, label: 'Bridge', action: () => setShowBridge(true), color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+                ].map(({ icon, label, action, color, bg }) => (
                   <button key={label} onClick={action}
-                    className="flex flex-col items-center gap-1 rounded-xl py-3 transition active:scale-95"
-                    style={{ background:'rgba(59,130,246,0.08)', color:'#1d4ed8', minHeight:56 }}>
-                    {icon}
-                    <span className="text-xs font-semibold">{label}</span>
+                    className="flex flex-col items-center gap-1.5 rounded-2xl py-3 transition active:scale-95">
+                    <div className="flex size-10 items-center justify-center rounded-full" style={{ background: bg, color }}>
+                      {icon}
+                    </div>
+                    <span className="text-xs font-semibold" style={{ color:textMain }}>{label}</span>
                   </button>
                 ))}
               </div>
@@ -644,7 +659,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                   {recentContacts.map(h => (
                     <button key={h.to} onClick={() => { setPayTo(h.to); setTab('pay') }}
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition active:scale-95"
-                      style={{ background:'rgba(255,255,255,0.5)' }}>
+                      style={{ background: dk ? 'rgba(255,255,255,0.07)' : 'rgba(59,130,246,0.06)', border: `1px solid ${dk ? 'rgba(255,255,255,0.08)' : 'rgba(59,130,246,0.1)'}` }}>
                       <div className="flex size-10 items-center justify-center rounded-full text-white text-sm font-bold flex-shrink-0"
                         style={{ background:'linear-gradient(135deg,#10b981,#3b82f6)' }}>
                         {h.to.slice(2, 4).toUpperCase()}
@@ -1129,15 +1144,15 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
       {/* ── SPLIT BILL SHEET ── */}
       {showSplit && (
         <div className="fixed inset-0 z-30 flex items-end" style={{ background:'rgba(0,0,0,0.4)' }} onClick={() => setShowSplit(false)}>
-          <div className="w-full rounded-t-3xl p-6" style={{ ...glass.card, maxWidth:448, margin:'0 auto' }} onClick={e => e.stopPropagation()}>
-            <div className="mb-1 h-1 w-10 rounded-full mx-auto" style={{ background:'#d1d5db' }} />
+          <div className="w-full rounded-t-3xl p-6" style={{ ...cardStyle, maxWidth:448, margin:'0 auto' }} onClick={e => e.stopPropagation()}>
+            <div className="mb-1 h-1 w-10 rounded-full mx-auto" style={{ background: dk ? 'rgba(255,255,255,0.2)' : '#d1d5db' }} />
             <h3 className="font-bold text-base mb-4 mt-2" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Split Bill</h3>
 
             <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>Total amount ($)</label>
             <input value={splitTotal} onChange={e => setSplitTotal(e.target.value)}
               placeholder="0.00" type="number" inputMode="decimal"
               className="w-full rounded-xl p-3 mb-3 text-xl font-bold outline-none tabular-nums"
-              style={{ ...glass.inner, color:textMain, fontFamily:'Space Grotesk,sans-serif' }} />
+              style={{ ...innerStyle, color:textMain, fontFamily:'Space Grotesk,sans-serif' }} />
 
             <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>Number of people</label>
             <div className="flex gap-2 mb-4">
@@ -1181,8 +1196,8 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
       {/* ── BRIDGE SHEET ── */}
       {showBridge && (
         <div className="fixed inset-0 z-30 flex items-end" style={{ background:'rgba(0,0,0,0.4)' }} onClick={() => setShowBridge(false)}>
-          <div className="w-full rounded-t-3xl p-6" style={{ ...glass.card, maxWidth:448, margin:'0 auto' }} onClick={e => e.stopPropagation()}>
-            <div className="mb-1 h-1 w-10 rounded-full mx-auto" style={{ background:'#d1d5db' }} />
+          <div className="w-full rounded-t-3xl p-6" style={{ ...cardStyle, maxWidth:448, margin:'0 auto' }} onClick={e => e.stopPropagation()}>
+            <div className="mb-1 h-1 w-10 rounded-full mx-auto" style={{ background: dk ? 'rgba(255,255,255,0.2)' : '#d1d5db' }} />
             <h3 className="font-bold text-base mb-1 mt-2" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Bridge USDC to Arc</h3>
             <p className="text-xs mb-4" style={{ color:textMuted }}>Move USDC from another chain to Arc for near-zero fees</p>
 
@@ -1201,7 +1216,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
             <input value={bridgeAmount} onChange={e => setBridgeAmount(e.target.value)}
               placeholder="0.00" type="number" inputMode="decimal"
               className="w-full rounded-xl p-3 mb-4 text-xl font-bold outline-none tabular-nums"
-              style={{ ...glass.inner, color:textMain, fontFamily:'Space Grotesk,sans-serif' }} />
+              style={{ ...innerStyle, color:textMain, fontFamily:'Space Grotesk,sans-serif' }} />
 
             <button onClick={() => void handleBridge()}
               disabled={!isConnected || !bridgeAmount || bridgeStep === 'bridging'}
