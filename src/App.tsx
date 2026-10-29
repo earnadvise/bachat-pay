@@ -37,6 +37,7 @@ const ARC_CHAIN_ID = arc.id // 5042
 const USDC_ADDRESS = '0x3600000000000000000000000000000000000000' as const
 const USDC_DECIMALS = 6
 const EXPLORER = 'https://explorer.arc.io'
+const ARC_EXPLORER_API = 'https://explorer.arc.io/api/v2'
 
 const glass = {
   card: {
@@ -201,12 +202,90 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
   const isFav = (addr: string) => favs.some(f => f.address.toLowerCase() === addr.toLowerCase())
 
+  // ── Dark mode ──────────────────────────────────────────────────────────────
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('bachat_dark') === '1')
+  const toggleDark = () => setDarkMode(d => { localStorage.setItem('bachat_dark', d ? '0' : '1'); return !d })
+
+  // ── Onchain history from Arc explorer ─────────────────────────────────────
+  const [onchainHistory, setOnchainHistory] = useState<HistoryEntry[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  useEffect(() => {
+    if (!address) return
+    setHistoryLoading(true)
+    const ctrl = new AbortController()
+    void (async () => {
+      try {
+        const res = await fetch(
+          `${ARC_EXPLORER_API}/addresses/${address}/token-transfers?token=${USDC_ADDRESS}&limit=20`,
+          { signal: ctrl.signal }
+        )
+        if (!res.ok) return
+        const data = await res.json() as { items?: Array<{ transaction_hash: string; from: { hash: string }; to: { hash: string }; total: { value: string; decimals: string }; timestamp: string }> }
+        const items: HistoryEntry[] = (data.items ?? []).map(tx => ({
+          hash: tx.transaction_hash,
+          to: tx.from.hash.toLowerCase() === address.toLowerCase() ? tx.to.hash : tx.from.hash,
+          amount: (parseInt(tx.total.value) / 10 ** parseInt(tx.total.decimals)).toFixed(2),
+          note: 'USDC transfer',
+          ts: new Date(tx.timestamp).getTime(),
+          dir: tx.from.hash.toLowerCase() === address.toLowerCase() ? 'out' : 'in',
+        }))
+        if (!ctrl.signal.aborted) setOnchainHistory(items)
+      } catch { /* ignore */ }
+      finally { if (!ctrl.signal.aborted) setHistoryLoading(false) }
+    })()
+    return () => ctrl.abort()
+  }, [address])
+
+  // merged history: onchain first, then local-only entries not in onchain
+  const mergedHistory = [
+    ...onchainHistory,
+    ...history.filter(h => !onchainHistory.find(o => o.hash === h.hash)),
+  ].sort((a, b) => b.ts - a.ts).slice(0, 50)
+
+  // ── Recent contacts (saved from pay history) ───────────────────────────────
+  const saveRecentContact = useCallback((addr: string) => {
+    try {
+      const key = 'bachat_recents'
+      const prev: string[] = JSON.parse(localStorage.getItem(key) ?? '[]') as string[]
+      const next = [addr, ...prev.filter(a => a !== addr)].slice(0, 8)
+      localStorage.setItem(key, JSON.stringify(next))
+    } catch { /* ignore */ }
+  }, [])
+  const [recentAddrs] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('bachat_recents') ?? '[]') as string[] } catch { return [] }
+  })
+
   // ── Pay tab ───────────────────────────────────────────────────────────────
   const [payTo, setPayTo] = useState(() => new URLSearchParams(window.location.search).get('to') ?? '')
   const [payAmount, setPayAmount] = useState(() => new URLSearchParams(window.location.search).get('amount') ?? '')
   const [payNote, setPayNote] = useState(() => new URLSearchParams(window.location.search).get('note') ?? '')
   const [payStep, setPayStep] = useState<'idle' | 'sending' | 'done'>('idle')
   const [payHash, setPayHash] = useState<`0x${string}` | undefined>()
+  const [payInrMode, setPayInrMode] = useState(false)
+  const [payInrAmount, setPayInrAmount] = useState('')
+
+  // ── Gas estimate ───────────────────────────────────────────────────────────
+  const [gasEst, setGasEst] = useState<string>('')
+  useEffect(() => {
+    if (!isAddress(payTo) || !payAmount || !address) { setGasEst(''); return }
+    const ctrl = new AbortController()
+    void (async () => {
+      try {
+        const res = await fetch('https://rpc.mainnet.arc.io', {
+          method: 'POST', signal: ctrl.signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_gasPrice', params:[] }),
+        })
+        const j = await res.json() as { result: string }
+        const gasPriceWei = parseInt(j.result, 16)
+        const gasUnits = 65000
+        const gasCostUSDC = (gasPriceWei * gasUnits) / 1e18
+        const display = gasCostUSDC < 0.001 ? '<$0.001' : `~$${gasCostUSDC.toFixed(4)}`
+        if (!ctrl.signal.aborted) setGasEst(display)
+      } catch { if (!ctrl.signal.aborted) setGasEst('') }
+    })()
+    return () => ctrl.abort()
+  }, [payTo, payAmount, address])
 
   const { writeContractAsync: transferUsdc } = useWriteContract()
   const { isSuccess: transferSuccess } = useWaitForTransactionReceipt({ hash: payHash, chainId: ARC_CHAIN_ID })
@@ -215,6 +294,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
     if (!transferSuccess || payStep !== 'sending' || !payHash) return
     setPayStep('done')
     saveEntry({ hash: payHash, to: payTo, amount: payAmount, note: payNote, ts: Date.now(), dir: 'out' })
+    saveRecentContact(payTo)
     void refetchBalance()
     toast.success('Payment sent!')
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -239,7 +319,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
     }
   }, [address, payTo, payAmount, payNote, chainId, switchChainAsync, transferUsdc])
 
-  const resetPay = () => { setPayStep('idle'); setPayTo(''); setPayAmount(''); setPayNote(''); setPayHash(undefined) }
+  const resetPay = () => { setPayStep('idle'); setPayTo(''); setPayAmount(''); setPayNote(''); setPayHash(undefined); setPayInrAmount('') }
 
   // ── QR Scanner ────────────────────────────────────────────────────────────
   const [scanning, setScanning] = useState(false)
@@ -447,16 +527,23 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
     history.filter(h => h.dir === 'out').map(h => [h.to, h])
   ).values()].slice(0, 5)
 
+  const dk = darkMode
+  const bg = dk ? { background: 'linear-gradient(160deg,#0f1c35 0%,#1a0a2e 50%,#0d1a2e 100%)' } : { background: 'linear-gradient(160deg,#f0f7ff 0%,#fffdf7 50%,#f7f0ff 100%)' }
+  const cardStyle = dk ? { background:'rgba(255,255,255,0.06)', backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.10)', boxShadow:'0 8px 32px rgba(0,0,0,0.4)' } as React.CSSProperties : glass.card
+  const innerStyle = dk ? { background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)' } as React.CSSProperties : glass.inner
+  const textMain = dk ? '#e8f0ff' : '#0f1c35'
+  const textMuted = dk ? '#8ba3c7' : '#6b7c99'
+
   return (
-    <div className="relative min-h-dvh overflow-hidden" style={{ background: 'linear-gradient(160deg,#f0f7ff 0%,#fffdf7 50%,#f7f0ff 100%)' }}>
+    <div className="relative min-h-dvh overflow-hidden" style={bg}>
       {/* blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div style={{ position:'absolute', top:'5%', left:'10%', width:260, height:260, borderRadius:'50%', background:'radial-gradient(circle,rgba(100,170,255,0.18) 0%,transparent 70%)', filter:'blur(50px)' }} />
-        <div style={{ position:'absolute', bottom:'12%', right:'5%', width:220, height:220, borderRadius:'50%', background:'radial-gradient(circle,rgba(200,160,255,0.16) 0%,transparent 70%)', filter:'blur(50px)' }} />
+        <div style={{ position:'absolute', top:'5%', left:'10%', width:260, height:260, borderRadius:'50%', background: dk ? 'radial-gradient(circle,rgba(59,130,246,0.15) 0%,transparent 70%)' : 'radial-gradient(circle,rgba(100,170,255,0.18) 0%,transparent 70%)', filter:'blur(50px)' }} />
+        <div style={{ position:'absolute', bottom:'12%', right:'5%', width:220, height:220, borderRadius:'50%', background: dk ? 'radial-gradient(circle,rgba(139,92,246,0.15) 0%,transparent 70%)' : 'radial-gradient(circle,rgba(200,160,255,0.16) 0%,transparent 70%)', filter:'blur(50px)' }} />
       </div>
 
       {/* ── HEADER ── */}
-      <header className="relative z-10 flex items-center justify-between px-4 pt-safe-top pb-3 pt-4" style={glass.card}>
+      <header className="relative z-10 flex items-center justify-between px-4 pt-safe-top pb-3 pt-4" style={cardStyle}>
         <button
           onClick={onGoBack}
           className="flex items-center gap-2 rounded-xl px-2 py-1 transition-opacity hover:opacity-70 active:opacity-50"
@@ -466,9 +553,14 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
           <div className="flex size-8 items-center justify-center rounded-full" style={{ background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)' }}>
             <TokenUSDC size={18} variant="branded" />
           </div>
-          <span className="text-base font-bold tracking-tight" style={{ fontFamily:'Space Grotesk,sans-serif', color:'#0f1c35' }}>BachatPay</span>
+          <span className="text-base font-bold tracking-tight" style={{ fontFamily:'Space Grotesk,sans-serif', color:textMain }}>BachatPay</span>
         </button>
-        <ConnectKitButton />
+        <div className="flex items-center gap-2">
+          <button onClick={toggleDark} className="flex size-8 items-center justify-center rounded-full text-lg transition active:scale-90" style={{ background: dk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} title="Toggle dark mode">
+            {dk ? '☀️' : '🌙'}
+          </button>
+          <ConnectKitButton />
+        </div>
       </header>
 
       {/* ── CONTENT ── */}
@@ -489,20 +581,20 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
             )}
 
             {/* Balance hero */}
-            <div className="rounded-2xl p-5" style={glass.card}>
-              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color:'#6b7c99' }}>Your USDC Balance</p>
+            <div className="rounded-2xl p-5" style={cardStyle}>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color:textMuted }}>Your USDC Balance</p>
               <div className="flex items-end gap-2 mb-1">
-                <span className="text-4xl font-bold tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:'#0f1c35' }}>
+                <span className="text-4xl font-bold tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:textMain }}>
                   {!isConnected ? 'Connect wallet' : !onArc ? 'Switch chain' : `$${balanceDisplay}`}
                 </span>
-                {isConnected && onArc && <span className="mb-1 text-sm font-semibold" style={{ color:'#6b7c99' }}>USDC</span>}
+                {isConnected && onArc && <span className="mb-1 text-sm font-semibold" style={{ color:textMuted }}>USDC</span>}
               </div>
               {isConnected && onArc && usdcBalance != null && (
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-lg font-semibold tabular-nums" style={{ color:'#16a34a' }}>
                     {toInr(balanceDisplay)}
                   </span>
-                  <span className="text-xs" style={{ color:'#6b7c99' }}>
+                  <span className="text-xs" style={{ color:textMuted }}>
                     1 USDC = ₹{inrRate.toFixed(2)}{rateAge ? ` · ${rateAge}` : ''}
                   </span>
                 </div>
@@ -527,8 +619,8 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
             {/* Favourites */}
             {favs.length > 0 && (
-              <div className="rounded-2xl p-4" style={glass.card}>
-                <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color:'#6b7c99' }}>Favourites</p>
+              <div className="rounded-2xl p-4" style={cardStyle}>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color:textMuted }}>Favourites</p>
                 <div className="flex gap-3 overflow-x-auto pb-1">
                   {favs.map(f => (
                     <button key={f.address} onClick={() => { setPayTo(f.address); setTab('pay') }}
@@ -537,7 +629,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                         style={{ background:'linear-gradient(135deg,#3b82f6,#8b5cf6)' }}>
                         {f.name.slice(0, 1).toUpperCase()}
                       </div>
-                      <span className="text-xs font-medium" style={{ color:'#0f1c35' }}>{f.name}</span>
+                      <span className="text-xs font-medium" style={{ color:textMain }}>{f.name}</span>
                     </button>
                   ))}
                 </div>
@@ -546,8 +638,8 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
             {/* Recent */}
             {recentContacts.length > 0 && (
-              <div className="rounded-2xl p-4" style={glass.card}>
-                <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color:'#6b7c99' }}>Recent</p>
+              <div className="rounded-2xl p-4" style={cardStyle}>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color:textMuted }}>Recent</p>
                 <div className="space-y-2">
                   {recentContacts.map(h => (
                     <button key={h.to} onClick={() => { setPayTo(h.to); setTab('pay') }}
@@ -558,10 +650,10 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                         {h.to.slice(2, 4).toUpperCase()}
                       </div>
                       <div className="flex-1 text-left">
-                        <p className="text-sm font-semibold" style={{ color:'#0f1c35' }}>{shortAddr(h.to)}</p>
-                        <p className="text-xs" style={{ color:'#6b7c99' }}>${h.amount} USDC · {toInr(h.amount)} · {fmtDate(h.ts)}</p>
+                        <p className="text-sm font-semibold" style={{ color:textMain }}>{shortAddr(h.to)}</p>
+                        <p className="text-xs" style={{ color:textMuted }}>${h.amount} USDC · {toInr(h.amount)} · {fmtDate(h.ts)}</p>
                       </div>
-                      <ChevronRight size={14} style={{ color:'#6b7c99' }} />
+                      <ChevronRight size={14} style={{ color:textMuted }} />
                     </button>
                   ))}
                 </div>
@@ -571,23 +663,23 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
             {/* Split bill shortcut */}
             <button onClick={() => setShowSplit(true)}
               className="flex w-full items-center gap-3 rounded-2xl p-4 transition active:scale-95"
-              style={glass.card}>
+              style={cardStyle}>
               <div className="flex size-10 items-center justify-center rounded-full" style={{ background:'rgba(16,185,129,0.12)', color:'#059669' }}>
                 <Users size={20} />
               </div>
               <div className="flex-1 text-left">
-                <p className="text-sm font-semibold" style={{ color:'#0f1c35' }}>Split Bill</p>
-                <p className="text-xs" style={{ color:'#6b7c99' }}>Divide a bill and share payment links</p>
+                <p className="text-sm font-semibold" style={{ color:textMain }}>Split Bill</p>
+                <p className="text-xs" style={{ color:textMuted }}>Divide a bill and share payment links</p>
               </div>
-              <ChevronRight size={16} style={{ color:'#6b7c99' }} />
+              <ChevronRight size={16} style={{ color:textMuted }} />
             </button>
 
             {/* Connect prompt */}
             {!isConnected && (
-              <div className="rounded-2xl p-5 text-center" style={glass.card}>
+              <div className="rounded-2xl p-5 text-center" style={cardStyle}>
                 <Wallet size={32} className="mx-auto mb-2" style={{ color:'#3b82f6' }} />
-                <p className="font-semibold mb-1" style={{ color:'#0f1c35' }}>Connect your wallet</p>
-                <p className="text-sm mb-3" style={{ color:'#6b7c99' }}>Use MetaMask, Coinbase Wallet, or scan with your phone</p>
+                <p className="font-semibold mb-1" style={{ color:textMain }}>Connect your wallet</p>
+                <p className="text-sm mb-3" style={{ color:textMuted }}>Use MetaMask, Coinbase Wallet, or scan with your phone</p>
                 <ConnectKitButton />
               </div>
             )}
@@ -596,12 +688,12 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
         {/* PAY TAB */}
         {tab === 'pay' && (
-          <div className="rounded-2xl p-5" style={glass.card}>
+          <div className="rounded-2xl p-5" style={cardStyle}>
             {payStep === 'done' && payHash ? (
               <div className="text-center py-4">
                 <CheckCircle2 size={48} className="mx-auto mb-3" style={{ color:'#10b981' }} />
-                <p className="text-lg font-bold mb-1" style={{ color:'#0f1c35' }}>Sent!</p>
-                <p className="text-sm mb-4" style={{ color:'#6b7c99' }}>${payAmount} USDC {payAmount ? `(${toInr(payAmount)})` : ''} to {shortAddr(payTo)}</p>
+                <p className="text-lg font-bold mb-1" style={{ color:textMain }}>Sent!</p>
+                <p className="text-sm mb-4" style={{ color:textMuted }}>${payAmount} USDC {payAmount ? `(${toInr(payAmount)})` : ''} to {shortAddr(payTo)}</p>
                 <div className="flex gap-2 justify-center">
                   <a href={`${EXPLORER}/tx/${payHash}`} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1 rounded-xl px-4 py-2.5 text-sm font-semibold"
@@ -618,7 +710,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
             ) : (
               <>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-bold text-base" style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}>Send USDC</h2>
+                  <h2 className="font-bold text-base" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Send USDC</h2>
                   <button onClick={() => void startScan()} className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold"
                     style={{ background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>
                     <ScanLine size={14} /> Scan QR
@@ -638,45 +730,95 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 )}
 
                 {/* To address */}
-                <div className="mb-3" style={glass.inner}>
+                <div className="mb-3" style={innerStyle}>
                   <div className="rounded-xl p-3">
-                    <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>To</label>
+                    <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>To</label>
                     <input
                       value={payTo}
                       onChange={e => setPayTo(e.target.value)}
                       placeholder="0x wallet address"
                       className="w-full bg-transparent text-sm outline-none font-mono"
-                      style={{ color:'#0f1c35' }}
+                      style={{ color:textMain }}
                     />
                   </div>
                 </div>
 
-                {/* Favourites quick-select */}
-                {favs.length > 0 && !payTo && (
-                  <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
-                    {favs.map(f => (
-                      <button key={f.address} onClick={() => setPayTo(f.address)}
-                        className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold"
-                        style={{ background:'rgba(59,130,246,0.1)', color:'#1d4ed8' }}>
-                        {f.name}
-                      </button>
-                    ))}
+                {/* Favourites + recents quick-select */}
+                {!payTo && (favs.length > 0 || recentAddrs.length > 0) && (
+                  <div className="mb-3">
+                    {favs.length > 0 && (
+                      <>
+                        <p className="text-xs font-semibold mb-1.5" style={{ color:textMuted }}>Favourites</p>
+                        <div className="flex gap-2 overflow-x-auto pb-1 mb-2">
+                          {favs.map(f => (
+                            <button key={f.address} onClick={() => setPayTo(f.address)}
+                              className="flex-shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
+                              style={{ background:'rgba(245,158,11,0.12)', color:'#b45309' }}>
+                              ⭐ {f.name}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {recentAddrs.filter(a => !favs.find(f => f.address === a)).length > 0 && (
+                      <>
+                        <p className="text-xs font-semibold mb-1.5" style={{ color:textMuted }}>Recent</p>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {recentAddrs.filter(a => !favs.find(f => f.address === a)).slice(0, 5).map(a => (
+                            <button key={a} onClick={() => setPayTo(a)}
+                              className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold"
+                              style={{ background:'rgba(59,130,246,0.10)', color:'#1d4ed8' }}>
+                              {shortAddr(a)}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
-                {/* Amount */}
-                <div className="mb-3" style={glass.inner}>
+                {/* Amount with INR toggle */}
+                <div className="mb-3" style={innerStyle}>
                   <div className="rounded-xl p-3">
-                    <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Amount (USDC)</label>
-                    <input
-                      value={payAmount}
-                      onChange={e => setPayAmount(e.target.value)}
-                      placeholder="0.00"
-                      type="number"
-                      inputMode="decimal"
-                      className="w-full bg-transparent text-2xl font-bold outline-none tabular-nums"
-                      style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold" style={{ color:textMuted }}>{payInrMode ? 'Amount (₹ INR)' : 'Amount (USDC)'}</label>
+                      <button onClick={() => { setPayInrMode(m => !m); setPayInrAmount(''); setPayAmount('') }}
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background:'rgba(59,130,246,0.12)', color:'#1d4ed8' }}>
+                        {payInrMode ? 'Switch to USDC' : 'Enter in ₹'}
+                      </button>
+                    </div>
+                    {payInrMode ? (
+                      <>
+                        <input
+                          value={payInrAmount}
+                          onChange={e => { setPayInrAmount(e.target.value); setPayAmount(inrRate > 0 ? (parseFloat(e.target.value || '0') / inrRate).toFixed(4) : '') }}
+                          placeholder="0"
+                          type="number"
+                          inputMode="decimal"
+                          className="w-full bg-transparent text-2xl font-bold outline-none tabular-nums"
+                          style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}
+                        />
+                        {payAmount && parseFloat(payAmount) > 0 && (
+                          <p className="text-xs mt-1" style={{ color:textMuted }}>${parseFloat(payAmount).toFixed(4)} USDC</p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          value={payAmount}
+                          onChange={e => setPayAmount(e.target.value)}
+                          placeholder="0.00"
+                          type="number"
+                          inputMode="decimal"
+                          className="w-full bg-transparent text-2xl font-bold outline-none tabular-nums"
+                          style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}
+                        />
+                        {payAmount && parseFloat(payAmount) > 0 && (
+                          <p className="text-xs mt-1" style={{ color:textMuted }}>{toInr(payAmount)}</p>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -694,15 +836,15 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 </div>
 
                 {/* Note */}
-                <div className="mb-4" style={glass.inner}>
+                <div className="mb-4" style={innerStyle}>
                   <div className="rounded-xl p-3">
-                    <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Note (optional)</label>
+                    <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>Note (optional)</label>
                     <input
                       value={payNote}
                       onChange={e => setPayNote(e.target.value)}
                       placeholder="Groceries, chai, rent…"
                       className="w-full bg-transparent text-sm outline-none"
-                      style={{ color:'#0f1c35' }}
+                      style={{ color:textMain }}
                     />
                   </div>
                 </div>
@@ -728,6 +870,14 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                   </button>
                 )}
 
+                {/* Gas estimate */}
+                {gasEst && isAddress(payTo) && payAmount && (
+                  <div className="flex items-center gap-1.5 mb-3 px-1">
+                    <Zap size={12} style={{ color:'#10b981' }} />
+                    <span className="text-xs" style={{ color:textMuted }}>Network fee: <span style={{ color:'#10b981', fontWeight:600 }}>{gasEst}</span> · Near-instant on Arc</span>
+                  </div>
+                )}
+
                 {/* Pay button */}
                 <button
                   onClick={() => void handlePay()}
@@ -740,7 +890,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 </button>
                 {/* Hint under pay button */}
                 {isConnected && onArc && (!isAddress(payTo) || !payAmount) && (
-                  <p className="text-center text-xs mt-2" style={{ color:'#6b7c99' }}>
+                  <p className="text-center text-xs mt-2" style={{ color:textMuted }}>
                     {!payTo ? 'Enter a recipient address or scan their QR code' : !isAddress(payTo) ? 'Enter a valid wallet address (0x…)' : 'Enter an amount to continue'}
                   </p>
                 )}
@@ -751,21 +901,21 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
         {/* RECEIVE TAB */}
         {tab === 'receive' && (
-          <div className="rounded-2xl p-5 text-center" style={glass.card}>
-            <h2 className="font-bold text-base mb-4" style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}>Receive USDC</h2>
+          <div className="rounded-2xl p-5 text-center" style={cardStyle}>
+            <h2 className="font-bold text-base mb-4" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Receive USDC</h2>
 
             {address ? (
               <>
                 {/* Shop name input */}
-                <div className="mb-4 text-left" style={glass.inner}>
+                <div className="mb-4 text-left" style={innerStyle}>
                   <div className="rounded-xl p-3">
-                    <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Shop / Your Name (optional)</label>
+                    <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>Shop / Your Name (optional)</label>
                     <input
                       value={shopName}
                       onChange={e => { setShopName(e.target.value); localStorage.setItem('bachat_shopName', e.target.value) }}
                       placeholder="e.g. Sharma Kirana Store"
                       className="w-full bg-transparent text-base font-bold outline-none"
-                      style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}
+                      style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}
                       maxLength={40}
                     />
                   </div>
@@ -808,7 +958,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
                 {/* Accepted networks */}
                 <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5">
-                  <span className="text-xs font-semibold" style={{ color:'#6b7c99' }}>Accepts USDC on:</span>
+                  <span className="text-xs font-semibold" style={{ color:textMuted }}>Accepts USDC on:</span>
                   {[
                     { name: 'Arc', color: '#3b82f6' },
                     { name: 'Base', color: '#0052ff' },
@@ -824,12 +974,12 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                   ))}
                 </div>
 
-                <p className="text-xs font-mono mb-4 px-2 break-all" style={{ color:'#6b7c99' }}>{address}</p>
+                <p className="text-xs font-mono mb-4 px-2 break-all" style={{ color:textMuted }}>{address}</p>
 
                 {/* Request amount */}
-                <div className="mb-4 text-left" style={glass.inner}>
+                <div className="mb-4 text-left" style={innerStyle}>
                   <div className="rounded-xl p-3">
-                    <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Request amount (optional)</label>
+                    <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>Request amount (optional)</label>
                     <input
                       value={receiveAmount}
                       onChange={e => setReceiveAmount(e.target.value)}
@@ -837,7 +987,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                       type="number"
                       inputMode="decimal"
                       className="w-full bg-transparent text-xl font-bold outline-none tabular-nums"
-                      style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}
+                      style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}
                     />
                   </div>
                 </div>
@@ -892,8 +1042,8 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                   <QrCode size={28} color="white" />
                 </div>
                 <div>
-                  <p className="text-base font-semibold mb-1" style={{ color:'#0f1c35' }}>Your payment QR</p>
-                  <p className="text-sm" style={{ color:'#6b7c99' }}>Connect your wallet to generate your QR code</p>
+                  <p className="text-base font-semibold mb-1" style={{ color:textMain }}>Your payment QR</p>
+                  <p className="text-sm" style={{ color:textMuted }}>Connect your wallet to generate your QR code</p>
                 </div>
                 <ConnectKitButton />
               </div>
@@ -903,31 +1053,42 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
         {/* HISTORY TAB */}
         {tab === 'history' && (
-          <div className="rounded-2xl p-4" style={glass.card}>
-            <h2 className="font-bold text-base mb-4" style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}>Transaction History</h2>
-            {history.length === 0 ? (
-              <p className="text-sm text-center py-8" style={{ color:'#6b7c99' }}>No transactions yet</p>
+          <div className="rounded-2xl p-4" style={cardStyle}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-base" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Transaction History</h2>
+              {historyLoading && <Loader2 size={14} className="animate-spin" style={{ color:textMuted }} />}
+              {!historyLoading && onchainHistory.length > 0 && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background:'rgba(16,185,129,0.12)', color:'#059669' }}>Live from Arc</span>
+              )}
+            </div>
+            {!address ? (
+              <p className="text-sm text-center py-8" style={{ color:textMuted }}>Connect wallet to see your transactions</p>
+            ) : mergedHistory.length === 0 && !historyLoading ? (
+              <p className="text-sm text-center py-8" style={{ color:textMuted }}>No transactions yet — send your first USDC!</p>
             ) : (
               <div className="space-y-2">
-                {history.map(h => (
+                {mergedHistory.map(h => (
                   <a key={h.hash} href={`${EXPLORER}/tx/${h.hash}`} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-3 rounded-xl px-3 py-3 transition active:scale-95"
-                    style={{ background:'rgba(255,255,255,0.5)' }}>
+                    style={{ background: dk ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.5)' }}>
                     <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-full"
                       style={{ background: h.dir === 'out' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', color: h.dir === 'out' ? '#dc2626' : '#059669' }}>
                       {h.dir === 'out' ? <Send size={16} /> : <ArrowDownLeft size={16} />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate" style={{ color:'#0f1c35' }}>
+                      <p className="text-sm font-semibold truncate" style={{ color:textMain }}>
                         {h.dir === 'out' ? `To ${shortAddr(h.to)}` : `From ${shortAddr(h.to)}`}
                       </p>
-                      <p className="text-xs truncate" style={{ color:'#6b7c99' }}>
+                      <p className="text-xs truncate" style={{ color:textMuted }}>
                         {h.note || 'USDC transfer'} · {fmtDate(h.ts)}
                       </p>
                     </div>
-                    <span className="text-sm font-bold flex-shrink-0" style={{ color: h.dir === 'out' ? '#dc2626' : '#059669' }}>
-                      {h.dir === 'out' ? '-' : '+'}${h.amount}
-                    </span>
+                    <div className="text-right flex-shrink-0">
+                      <span className="text-sm font-bold block" style={{ color: h.dir === 'out' ? '#dc2626' : '#059669' }}>
+                        {h.dir === 'out' ? '-' : '+'}${h.amount}
+                      </span>
+                      <span className="text-xs" style={{ color:textMuted }}>{toInr(h.amount)}</span>
+                    </div>
                   </a>
                 ))}
               </div>
@@ -944,7 +1105,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
       </main>
 
       {/* ── BOTTOM NAV ── */}
-      <nav className="fixed bottom-0 inset-x-0 z-20 pb-safe-bottom" style={glass.card}>
+      <nav className="fixed bottom-0 inset-x-0 z-20 pb-safe-bottom" style={{ ...cardStyle, borderTop: dk ? '1px solid rgba(255,255,255,0.08)' : undefined }}>
         <div className="mx-auto max-w-md flex">
           {([
             { id: 'home', icon: <Wallet size={18} />, label: 'Home' },
@@ -956,7 +1117,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
           ] as { id: Tab; icon: React.ReactNode; label: string }[]).map(({ id, icon, label }) => (
             <button key={id} onClick={() => setTab(id)}
               className="flex flex-1 flex-col items-center gap-0.5 py-3 transition"
-              style={{ color: tab === id ? '#1d4ed8' : '#9ca3af', minHeight: 60 }}>
+              style={{ color: tab === id ? '#3b82f6' : (dk ? '#4a6080' : '#9ca3af'), minHeight: 60 }}>
               {icon}
               <span className="text-xs font-semibold">{label}</span>
               {tab === id && <div className="h-0.5 w-6 rounded-full mt-0.5" style={{ background:'#1d4ed8' }} />}
@@ -970,15 +1131,15 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
         <div className="fixed inset-0 z-30 flex items-end" style={{ background:'rgba(0,0,0,0.4)' }} onClick={() => setShowSplit(false)}>
           <div className="w-full rounded-t-3xl p-6" style={{ ...glass.card, maxWidth:448, margin:'0 auto' }} onClick={e => e.stopPropagation()}>
             <div className="mb-1 h-1 w-10 rounded-full mx-auto" style={{ background:'#d1d5db' }} />
-            <h3 className="font-bold text-base mb-4 mt-2" style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}>Split Bill</h3>
+            <h3 className="font-bold text-base mb-4 mt-2" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Split Bill</h3>
 
-            <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Total amount ($)</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>Total amount ($)</label>
             <input value={splitTotal} onChange={e => setSplitTotal(e.target.value)}
               placeholder="0.00" type="number" inputMode="decimal"
               className="w-full rounded-xl p-3 mb-3 text-xl font-bold outline-none tabular-nums"
-              style={{ ...glass.inner, color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }} />
+              style={{ ...glass.inner, color:textMain, fontFamily:'Space Grotesk,sans-serif' }} />
 
-            <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Number of people</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>Number of people</label>
             <div className="flex gap-2 mb-4">
               {['2','3','4','5','6'].map(n => (
                 <button key={n} onClick={() => setSplitPeople(n)}
@@ -991,7 +1152,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
             {splitTotal && splitPeople && (
               <div className="mb-4 rounded-xl p-3 text-center" style={{ background:'rgba(59,130,246,0.08)' }}>
-                <p className="text-xs" style={{ color:'#6b7c99' }}>Each person pays</p>
+                <p className="text-xs" style={{ color:textMuted }}>Each person pays</p>
                 <p className="text-2xl font-bold" style={{ color:'#1d4ed8', fontFamily:'Space Grotesk,sans-serif' }}>
                   ${(parseFloat(splitTotal || '0') / parseInt(splitPeople || '1')).toFixed(2)}
                 </p>
@@ -1022,10 +1183,10 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
         <div className="fixed inset-0 z-30 flex items-end" style={{ background:'rgba(0,0,0,0.4)' }} onClick={() => setShowBridge(false)}>
           <div className="w-full rounded-t-3xl p-6" style={{ ...glass.card, maxWidth:448, margin:'0 auto' }} onClick={e => e.stopPropagation()}>
             <div className="mb-1 h-1 w-10 rounded-full mx-auto" style={{ background:'#d1d5db' }} />
-            <h3 className="font-bold text-base mb-1 mt-2" style={{ color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }}>Bridge USDC to Arc</h3>
-            <p className="text-xs mb-4" style={{ color:'#6b7c99' }}>Move USDC from another chain to Arc for near-zero fees</p>
+            <h3 className="font-bold text-base mb-1 mt-2" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Bridge USDC to Arc</h3>
+            <p className="text-xs mb-4" style={{ color:textMuted }}>Move USDC from another chain to Arc for near-zero fees</p>
 
-            <label className="text-xs font-semibold mb-2 block" style={{ color:'#6b7c99' }}>From chain</label>
+            <label className="text-xs font-semibold mb-2 block" style={{ color:textMuted }}>From chain</label>
             <div className="flex gap-2 mb-4 flex-wrap">
               {BRIDGE_CHAINS.map(b => (
                 <button key={b.label} onClick={() => setBridgeFrom(b)}
@@ -1036,11 +1197,11 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
               ))}
             </div>
 
-            <label className="text-xs font-semibold mb-1 block" style={{ color:'#6b7c99' }}>Amount (USDC)</label>
+            <label className="text-xs font-semibold mb-1 block" style={{ color:textMuted }}>Amount (USDC)</label>
             <input value={bridgeAmount} onChange={e => setBridgeAmount(e.target.value)}
               placeholder="0.00" type="number" inputMode="decimal"
               className="w-full rounded-xl p-3 mb-4 text-xl font-bold outline-none tabular-nums"
-              style={{ ...glass.inner, color:'#0f1c35', fontFamily:'Space Grotesk,sans-serif' }} />
+              style={{ ...glass.inner, color:textMain, fontFamily:'Space Grotesk,sans-serif' }} />
 
             <button onClick={() => void handleBridge()}
               disabled={!isConnected || !bridgeAmount || bridgeStep === 'bridging'}
