@@ -70,11 +70,11 @@ interface FeatureCardProps { icon: React.ReactNode; title: string; desc: string;
 function FeatureCard({ icon, title, desc, color, delay }: FeatureCardProps) {
   return (
     <FadeIn delay={delay}>
-      <div style={{
-        background: 'rgba(255,255,255,0.72)',
+      <div className="feature-card" style={{
+        background: 'rgba(255,255,255,0.78)',
         backdropFilter: 'blur(24px) saturate(180%)',
         WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-        border: '1px solid rgba(255,255,255,0.72)',
+        border: '1px solid rgba(255,255,255,0.8)',
         boxShadow: '0 8px 32px rgba(18,45,69,0.08)',
         borderRadius: 20,
         padding: '24px',
@@ -101,10 +101,24 @@ function FeatureCard({ icon, title, desc, color, delay }: FeatureCardProps) {
 function StatCard({ value, label }: { value: string; label: string }) {
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 36, fontWeight: 800, color: '#0f1c35', letterSpacing: '-0.03em', tabularNums: true } as React.CSSProperties}>
+      <div className="stat-val" style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: 36, fontWeight: 800, letterSpacing: '-0.03em' }}>
         {value}
       </div>
       <div style={{ fontSize: 13, color: '#6b7c99', marginTop: 4, fontWeight: 500 }}>{label}</div>
+    </div>
+  )
+}
+
+// ── Ticker strip ───────────────────────────────────────────────────────────────
+function TickerStrip() {
+  const items = ['⚡ Sub-second finality', '💰 USDC gas fees', '🔒 Onchain savings', '📱 PWA installable', '🌐 Bridge from Base/Arbitrum/ETH', '₹ Live INR rate', '🏪 Merchant QR', '👥 Chit fund ROSCA', '⚡ Sub-second finality', '💰 USDC gas fees', '🔒 Onchain savings', '📱 PWA installable', '🌐 Bridge from Base/Arbitrum/ETH', '₹ Live INR rate', '🏪 Merchant QR', '👥 Chit fund ROSCA']
+  return (
+    <div style={{ overflow: 'hidden', background: 'rgba(29,78,216,0.06)', borderTop: '1px solid rgba(29,78,216,0.1)', borderBottom: '1px solid rgba(29,78,216,0.1)', padding: '12px 0' }}>
+      <div style={{ display: 'flex', gap: 40, animation: 'ticker 30s linear infinite', whiteSpace: 'nowrap' }}>
+        {items.map((item, i) => (
+          <span key={i} style={{ fontSize: 13, fontWeight: 600, color: '#1d4ed8', flexShrink: 0 }}>{item}</span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -175,9 +189,13 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) 
         padding: '80px 24px 48px',
         overflow: 'hidden',
       }}>
-        {/* Background gradient */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(145deg, #1e3a8a 0%, #1d4ed8 35%, #2563eb 60%, #3b82f6 100%)', zIndex: 0 }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,0.08) 0%, transparent 70%)', zIndex: 1 }} />
+        {/* Background gradient + animated mesh */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(145deg, #0f172a 0%, #1e3a8a 40%, #1d4ed8 70%, #4c1d95 100%)', zIndex: 0 }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,0.07) 0%, transparent 70%)', zIndex: 1 }} />
+        {/* Animated mesh blobs */}
+        <div style={{ position:'absolute', top:'-20%', left:'-10%', width:'60%', height:'60%', borderRadius:'50%', background:'radial-gradient(circle,rgba(99,102,241,0.35) 0%,transparent 70%)', filter:'blur(80px)', animation:'mesh 12s ease-in-out infinite', zIndex:1 }} />
+        <div style={{ position:'absolute', bottom:'-10%', right:'-5%', width:'50%', height:'50%', borderRadius:'50%', background:'radial-gradient(circle,rgba(139,92,246,0.3) 0%,transparent 70%)', filter:'blur(80px)', animation:'mesh 15s ease-in-out infinite reverse', zIndex:1 }} />
+        <div style={{ position:'absolute', top:'40%', right:'20%', width:'30%', height:'30%', borderRadius:'50%', background:'radial-gradient(circle,rgba(59,130,246,0.25) 0%,transparent 70%)', filter:'blur(60px)', animation:'mesh 10s ease-in-out infinite 3s', zIndex:1 }} />
 
         {/* Floating orbs */}
         <FloatingOrb style={{ top: '15%', left: '8%', animation: 'float1 6s ease-in-out infinite' }} />
@@ -243,19 +261,21 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) 
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
+              className="hero-btn-primary"
               onClick={onEnterApp}
               style={{
-                background: '#fff',
+                background: 'linear-gradient(135deg,#fff 0%,#e0e7ff 100%)',
                 color: '#1d4ed8',
                 border: 'none',
                 borderRadius: 16,
-                padding: '16px 32px',
+                padding: '16px 36px',
                 fontSize: 16,
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 8,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+                boxShadow: '0 8px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.8)',
                 fontFamily: 'Space Grotesk, sans-serif',
+                animation: 'pulse-glow 3s ease-in-out infinite',
               }}
             >
               Launch App <ArrowRight size={18} />
@@ -313,6 +333,9 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) 
           <ChevronDown size={24} color="rgba(255,255,255,0.5)" />
         </div>
       </section>
+
+      {/* ── TICKER ─────────────────────────────────────────────────────────── */}
+      <TickerStrip />
 
       {/* ── STATS ──────────────────────────────────────────────────────────── */}
       <section style={{ padding: '64px 24px', maxWidth: 900, margin: '0 auto' }}>
@@ -551,9 +574,20 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) 
         @keyframes float2 { 0%,100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-12px) rotate(-3deg); } }
         @keyframes float3 { 0%,100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-22px) rotate(2deg); } }
         @keyframes bounce { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(8px); } }
+        @keyframes mesh { 0%,100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.08) rotate(3deg); } }
+        @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+        @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); } 50% { box-shadow: 0 0 0 12px rgba(59,130,246,0); } }
+        @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        @keyframes spin-slow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes gradient-shift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
         body { -webkit-font-smoothing: antialiased; }
+        .hero-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 48px rgba(0,0,0,0.35) !important; }
+        .hero-btn-primary { transition: all 0.2s ease; }
+        .feature-card:hover { transform: translateY(-4px); box-shadow: 0 20px 48px rgba(18,45,69,0.14) !important; }
+        .feature-card { transition: all 0.25s ease; }
+        .stat-val { background: linear-gradient(90deg,#1d4ed8,#7c3aed,#1d4ed8); background-size: 200% auto; animation: gradient-shift 3s ease infinite; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
       `}</style>
     </div>
   )
