@@ -1332,7 +1332,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
         {tab === 'vault' && <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="animate-spin text-blue-500" size={32} /></div>}><VaultTab toInr={toInr} /></Suspense>}
 
         {/* ── CHIT FUND TAB ── */}
-        {tab === 'chit' && <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="animate-spin text-blue-500" size={32} /></div>}><ChitFundTab toInr={toInr} darkMode={darkMode} /></Suspense>}
+        {tab === 'chit' && <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="animate-spin text-blue-500" size={32} /></div>}><ChitFundTab toInr={toInr} darkMode={darkMode} resolveLabel={(a: string) => resolveLabel(a, contacts, favs)} /></Suspense>}
 
       </main>
 

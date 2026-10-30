@@ -31,9 +31,10 @@ interface FundInfo {
   admin: string
 }
 
-interface Props { toInr: (u: string | number) => string; darkMode?: boolean }
+interface Props { toInr: (u: string | number) => string; darkMode?: boolean; resolveLabel?: (addr: string) => string }
 
-export default function ChitFundTab({ toInr, darkMode }: Props) {
+export default function ChitFundTab({ toInr, darkMode, resolveLabel: resolveLabelProp }: Props) {
+  const resolveLabel = resolveLabelProp ?? ((a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`)
   const { address, isConnected } = useAccount()
   const [view, setView] = useState<'home' | 'create' | 'join' | 'detail'>('home')
   const [fundName, setFundName] = useState('')
@@ -558,6 +559,7 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
       onBack={() => setView('home')}
       onPay={() => { setFundIdInput(String(selectedFund.id)); setContribution(fmt(selectedFund.contributionAmount)); setView('join') }}
       onCopy={() => { void navigator.clipboard.writeText(String(selectedFund.id)); toast.success('Fund ID copied!') }}
+      resolveLabel={resolveLabel}
     />
   )
 
@@ -577,9 +579,10 @@ interface DetailProps {
   onBack: () => void
   onPay: () => void
   onCopy: () => void
+  resolveLabel: (addr: string) => string
 }
 
-function DetailView({ fund, address, card, textMain, textMuted, darkMode, toInr, pendingAction, onBack, onPay, onCopy }: DetailProps) {
+function DetailView({ fund, address, card, textMain, textMuted, darkMode, toInr, pendingAction, onBack, onPay, onCopy, resolveLabel }: DetailProps) {
   const [paidStatus, setPaidStatus] = useState<Record<string, boolean>>({})
   const [loadingStatus, setLoadingStatus] = useState(true)
 
@@ -702,7 +705,9 @@ function DetailView({ fund, address, card, textMain, textMuted, darkMode, toInr,
       {recipient && (
         <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg,#7c3aed,#6d28d9)' }}>
           <p className="text-white text-xs font-medium mb-1">This round's pot goes to</p>
-          <p className="text-white font-bold text-base">{recipient.toLowerCase() === myAddr ? '🎉 YOU!' : `${recipient.slice(0, 8)}…${recipient.slice(-5)}`}</p>
+          <p className="text-white font-bold text-base">
+            {recipient.toLowerCase() === myAddr ? '🎉 YOU!' : resolveLabel(recipient)}
+          </p>
           <p className="text-purple-200 text-xs mt-1">Total pot: ${(parseFloat(fmt(fund.contributionAmount)) * totalMembers).toFixed(2)} USDC</p>
         </div>
       )}
@@ -717,22 +722,22 @@ function DetailView({ fund, address, card, textMain, textMuted, darkMode, toInr,
             const paid = paidStatus[m.toLowerCase()] ?? false
             const isMe = m.toLowerCase() === myAddr
             const getsPool = i === recipientIdx
+            const label = isMe ? 'You' : resolveLabel(m)
             return (
               <div key={m} className="flex items-center justify-between py-2.5 border-b" style={{ borderColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }}>
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{paid ? '✅' : '⏳'}</span>
                   <div>
-                    <p className="text-xs font-mono" style={{ color: isMe ? '#7c3aed' : textMain }}>
-                      {isMe ? 'You' : `${m.slice(0, 8)}…${m.slice(-5)}`}
-                    </p>
-                    <p className="text-xs" style={{ color: paid ? '#16a34a' : '#ef4444' }}>
-                      {paid ? 'Paid' : 'Not paid yet'}
+                    <p className="text-sm font-semibold" style={{ color: isMe ? '#7c3aed' : textMain }}>{label}</p>
+                    <p className="text-xs font-mono" style={{ color: textMuted }}>{m.slice(0, 8)}…{m.slice(-5)}</p>
+                    <p className="text-xs font-medium" style={{ color: paid ? '#16a34a' : '#ef4444' }}>
+                      {paid ? '✓ Paid this round' : '⏳ Not paid yet'}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-col items-end gap-1">
                   {getsPool && <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(124,58,237,0.15)', color: '#7c3aed' }}>Gets pot 💰</span>}
-                  <span className="text-xs" style={{ color: textMuted }}>#{i + 1}</span>
+                  <span className="text-xs" style={{ color: textMuted }}>Member #{i + 1}</span>
                 </div>
               </div>
             )
@@ -740,13 +745,25 @@ function DetailView({ fund, address, card, textMain, textMuted, darkMode, toInr,
         )}
       </div>
 
-      {/* Actions */}
+      {/* WhatsApp share */}
+      <button
+        onClick={() => {
+          const msg = `Hey! I created a committee called "${fund.name}" on BachatPay.\n\nCommittee ID: *${fund.id}*\nYour contribution: $${fmt(fund.contributionAmount)} USDC per round\n\nDownload BachatPay and pay your round:\nhttps://bachatpay.xyz`
+          window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+        }}
+        className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2"
+        style={{ background: '#25d366' }}
+      >
+        <span className="text-lg">💬</span> Share on WhatsApp
+      </button>
+
+      {/* Copy ID */}
       <button
         onClick={onCopy}
         className="w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
         style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(124,58,237,0.08)', color: '#7c3aed' }}
       >
-        <Copy size={16} /> Copy Committee ID to share
+        <Copy size={16} /> Copy Committee ID
       </button>
     </div>
   )
