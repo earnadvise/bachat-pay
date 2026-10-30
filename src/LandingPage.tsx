@@ -216,12 +216,7 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) 
             </div>
             <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#fff', letterSpacing: '-0.01em' }}>BachatPay</span>
           </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>GitHub</a>
-            <button onClick={onEnterApp} style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 12, padding: '8px 18px', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-              Open App
-            </button>
-          </div>
+          <div />
         </nav>
 
         {/* Hero content */}
