@@ -4,6 +4,7 @@
  */
 
 import LandingPage from './LandingPage'
+import { CONTRACTS } from './contracts'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { ConnectKitButton } from 'connectkit'
 import {
@@ -261,23 +262,62 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
     if (!address) return
     setHistoryLoading(true)
     const ctrl = new AbortController()
+    const KNOWN: Record<string, string> = {
+      [CONTRACTS.nanoPay.mainnet.toLowerCase()]: 'Payment',
+      [CONTRACTS.bachatVault.mainnet.toLowerCase()]: 'Vault',
+      [CONTRACTS.chitFund.mainnet.toLowerCase()]: 'Committee',
+    }
     void (async () => {
       try {
-        const res = await fetch(
-          `${ARC_EXPLORER_API}/addresses/${address}/token-transfers?token=${USDC_ADDRESS}&limit=50&_t=${Date.now()}`,
-          { signal: ctrl.signal, cache: 'no-store' }
-        )
-        if (!res.ok) return
-        const data = await res.json() as { items?: Array<{ transaction_hash: string; from: { hash: string }; to: { hash: string }; total: { value: string; decimals: string }; timestamp: string }> }
-        const items: HistoryEntry[] = (data.items ?? []).map(tx => ({
-          hash: tx.transaction_hash,
-          to: tx.from.hash.toLowerCase() === address.toLowerCase() ? tx.to.hash : tx.from.hash,
-          amount: (parseInt(tx.total.value) / 10 ** parseInt(tx.total.decimals)).toFixed(2),
-          note: 'USDC transfer',
-          ts: new Date(tx.timestamp).getTime(),
-          dir: tx.from.hash.toLowerCase() === address.toLowerCase() ? 'out' : 'in',
-        }))
-        if (!ctrl.signal.aborted) setOnchainHistory(items)
+        // Fetch USDC token transfers
+        const [transferRes, txRes] = await Promise.all([
+          fetch(`${ARC_EXPLORER_API}/addresses/${address}/token-transfers?token=${USDC_ADDRESS}&limit=50&_t=${Date.now()}`, { signal: ctrl.signal, cache: 'no-store' }),
+          fetch(`${ARC_EXPLORER_API}/addresses/${address}/transactions?limit=50&_t=${Date.now()}`, { signal: ctrl.signal, cache: 'no-store' }),
+        ])
+        const seen = new Set<string>()
+        const items: HistoryEntry[] = []
+
+        if (transferRes.ok) {
+          const data = await transferRes.json() as { items?: Array<{ transaction_hash: string; from: { hash: string }; to: { hash: string }; total: { value: string; decimals: string }; timestamp: string }> }
+          for (const tx of (data.items ?? [])) {
+            if (seen.has(tx.transaction_hash)) continue
+            seen.add(tx.transaction_hash)
+            const isOut = tx.from.hash.toLowerCase() === address.toLowerCase()
+            const counterparty = isOut ? tx.to.hash : tx.from.hash
+            const label = KNOWN[counterparty.toLowerCase()]
+            items.push({
+              hash: tx.transaction_hash,
+              to: counterparty,
+              amount: (parseInt(tx.total.value) / 10 ** parseInt(tx.total.decimals)).toFixed(2),
+              note: label ?? 'USDC transfer',
+              ts: new Date(tx.timestamp).getTime(),
+              dir: isOut ? 'out' : 'in',
+            })
+          }
+        }
+
+        // Also pull raw txs to catch contract interactions with no token transfer event
+        if (txRes.ok) {
+          const data2 = await txRes.json() as { items?: Array<{ hash: string; from: { hash: string }; to: { hash: string } | null; value: string; timestamp: string; status: string }> }
+          for (const tx of (data2.items ?? [])) {
+            if (seen.has(tx.hash) || tx.status !== 'ok' || !tx.to) continue
+            const toAddr = tx.to.hash.toLowerCase()
+            const label = KNOWN[toAddr]
+            if (!label) continue // only show known contract interactions
+            seen.add(tx.hash)
+            items.push({
+              hash: tx.hash,
+              to: tx.to.hash,
+              amount: '0.00',
+              note: label,
+              ts: new Date(tx.timestamp).getTime(),
+              dir: 'out',
+            })
+          }
+        }
+
+        items.sort((a, b) => b.ts - a.ts)
+        if (!ctrl.signal.aborted) setOnchainHistory(items.slice(0, 60))
       } catch { /* ignore */ }
       finally { if (!ctrl.signal.aborted) setHistoryLoading(false) }
     })()
@@ -1187,13 +1227,13 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                   <a key={h.hash} href={`${EXPLORER}/tx/${h.hash}`} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-3 rounded-xl px-3 py-3 transition active:scale-95"
                     style={{ background: dk ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.5)' }}>
-                    <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-full"
-                      style={{ background: h.dir === 'out' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', color: h.dir === 'out' ? '#dc2626' : '#059669' }}>
-                      {h.dir === 'out' ? <Send size={16} /> : <ArrowDownLeft size={16} />}
+                    <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-full text-lg"
+                      style={{ background: h.note === 'Committee' ? 'rgba(124,58,237,0.12)' : h.note === 'Vault' ? 'rgba(234,179,8,0.12)' : h.dir === 'out' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)' }}>
+                      {h.note === 'Committee' ? '🤝' : h.note === 'Vault' ? '🔒' : h.dir === 'out' ? <Send size={16} style={{ color:'#dc2626' }} /> : <ArrowDownLeft size={16} style={{ color:'#059669' }} />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate" style={{ color:textMain }}>
-                        {h.dir === 'out' ? `To ${resolveLabel(h.to, contacts, favs)}` : `From ${resolveLabel(h.to, contacts, favs)}`}
+                        {h.note === 'Committee' ? 'Committee Contribution' : h.note === 'Vault' ? 'Vault Deposit' : h.dir === 'out' ? `To ${resolveLabel(h.to, contacts, favs)}` : `From ${resolveLabel(h.to, contacts, favs)}`}
                       </p>
                       <p className="text-xs truncate" style={{ color:textMuted }}>
                         {h.note || 'USDC transfer'} · {fmtDate(h.ts)}
@@ -1201,9 +1241,9 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <span className="text-sm font-bold block" style={{ color: h.dir === 'out' ? '#dc2626' : '#059669' }}>
-                        {h.dir === 'out' ? '-' : '+'}${h.amount}
+                        {h.dir === 'out' ? '-' : '+'}${h.amount === '0.00' ? '–' : h.amount}
                       </span>
-                      <span className="text-xs" style={{ color:textMuted }}>{toInr(h.amount)}</span>
+                      <span className="text-xs" style={{ color:textMuted }}>{h.amount === '0.00' ? '' : toInr(h.amount)}</span>
                     </div>
                   </a>
                 ))}

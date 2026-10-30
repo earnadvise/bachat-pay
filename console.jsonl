@@ -197,3 +197,23 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793363877050}
 {"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793363878258}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793363878258}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793364118008}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793366329222}
+{"level":"debug","message":"[vite] connected.","timestamp":1793366329235}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793366416825}
+{"level":"debug","message":"[vite] connected.","timestamp":1793366417911}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793366421309}
+{"level":"debug","message":"[vite] connected.","timestamp":1793366422404}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793366447011}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793366457678}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793366457678}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793366459395}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793366459395}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793366484826}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793366484826}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793366501966}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793366501966}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793366503207}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793366503207}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793366504657}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793366504657}
