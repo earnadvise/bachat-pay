@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>BachatPay — Docs</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:#f0f4ff;color:#0f1c35;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .page{max-width:800px;margin:0 auto;padding:40px 32px;}
+  .btn-row{display:flex;gap:12px;margin-bottom:40px;flex-wrap:wrap;}
+  .btn{padding:12px 28px;border:none;border-radius:12px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer;}
+  .btn-primary{background:linear-gradient(135deg,#1d4ed8,#7c3aed);color:white;}
+  .btn-secondary{background:rgba(29,78,216,0.1);color:#1d4ed8;}
+
+  /* ── PITCH PAGE ── */
+  .pitch-header{background:linear-gradient(135deg,#0f172a,#1e3a8a,#4c1d95);border-radius:24px;padding:48px 40px;color:white;margin-bottom:32px;}
+  .pitch-logo{width:64px;height:64px;border-radius:20px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:20px;}
+  .pitch-title{font-family:'Space Grotesk',sans-serif;font-size:42px;font-weight:800;letter-spacing:-0.03em;margin-bottom:8px;}
+  .pitch-sub{font-size:18px;color:rgba(255,255,255,0.75);margin-bottom:24px;}
+  .pitch-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:6px 16px;font-size:13px;font-weight:600;}
+  .pitch-badge .dot{width:8px;height:8px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px #4ade80;}
+
+  .section{background:white;border-radius:20px;padding:32px;margin-bottom:20px;box-shadow:0 4px 24px rgba(18,45,69,0.06);}
+  .section-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#2563eb;margin-bottom:16px;}
+  .section h2{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:800;color:#0f1c35;margin-bottom:12px;letter-spacing:-0.02em;}
+  .section p{font-size:15px;line-height:1.7;color:#4b5563;margin-bottom:8px;}
+
+  .features-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:8px;}
+  .feature-item{background:#f8faff;border-radius:14px;padding:20px;border:1px solid rgba(37,99,235,0.1);}
+  .feature-icon{font-size:24px;margin-bottom:8px;}
+  .feature-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:#0f1c35;margin-bottom:4px;}
+  .feature-desc{font-size:13px;color:#6b7280;line-height:1.5;}
+
+  .contracts{display:flex;flex-direction:column;gap:10px;margin-top:8px;}
+  .contract-row{display:flex;align-items:center;justify-content:space-between;background:#f8faff;border-radius:12px;padding:14px 18px;border:1px solid rgba(37,99,235,0.1);flex-wrap:wrap;gap:8px;}
+  .contract-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:#0f1c35;}
+  .contract-addr{font-family:monospace;font-size:11px;color:#6b7280;}
+  .contract-dot{width:8px;height:8px;border-radius:50%;background:#4ade80;flex-shrink:0;}
+
+  .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px;}
+  .stat-box{text-align:center;background:#f8faff;border-radius:14px;padding:20px;border:1px solid rgba(37,99,235,0.1);}
+  .stat-val{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:800;background:linear-gradient(135deg,#1d4ed8,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.02em;}
+  .stat-label{font-size:12px;color:#6b7280;margin-top:4px;font-weight:500;}
+
+  .links-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;}
+  .link-chip{display:inline-flex;align-items:center;gap:6px;background:#f0f4ff;border:1px solid rgba(37,99,235,0.2);border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;color:#1d4ed8;text-decoration:none;}
+
+  /* ── SCRIPT PAGE ── */
+  .script-header{background:linear-gradient(135deg,#0f172a,#1e3a8a);border-radius:24px;padding:40px;color:white;margin-bottom:32px;}
+  .script-header h1{font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:800;margin-bottom:8px;}
+  .script-header p{color:rgba(255,255,255,0.7);font-size:15px;}
+  .scene{background:white;border-radius:16px;padding:24px 28px;margin-bottom:16px;box-shadow:0 4px 20px rgba(18,45,69,0.06);border-left:4px solid;}
+  .scene-1{border-color:#3b82f6;}
+  .scene-2{border-color:#8b5cf6;}
+  .scene-3{border-color:#10b981;}
+  .scene-4{border-color:#f59e0b;}
+  .scene-5{border-color:#ef4444;}
+  .scene-6{border-color:#06b6d4;}
+  .scene-7{border-color:#6366f1;}
+  .scene-time{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;}
+  .scene-action{font-size:12px;color:#9ca3af;font-style:italic;margin-bottom:8px;}
+  .scene-text{font-size:15px;line-height:1.7;color:#1f2937;font-weight:500;}
+  .tips{background:#f0fdf4;border:1px solid rgba(16,185,129,0.2);border-radius:16px;padding:24px 28px;margin-top:8px;}
+  .tips h3{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:#059669;margin-bottom:12px;}
+  .tips li{font-size:14px;color:#374151;line-height:1.8;margin-left:20px;}
+
+  .page-break{display:none;}
+
+  @media print{
+    body{background:white;}
+    .btn-row{display:none;}
+    .page-break{display:block;page-break-before:always;}
+    .page{padding:20px;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    <button class="btn btn-secondary" onclick="document.getElementById('pitch').scrollIntoView({behavior:'smooth'})">📄 Pitch Doc</button>
+    <button class="btn btn-secondary" onclick="document.getElementById('script').scrollIntoView({behavior:'smooth'})">🎬 Video Script</button>
+  </div>
+
+  <!-- ══ PITCH DOC ══ -->
+  <div id="pitch">
+
+    <div class="pitch-header">
+      <div class="pitch-logo">₹</div>
+      <div class="pitch-title">BachatPay</div>
+      <div class="pitch-sub">India's first USDC payments app on Arc blockchain</div>
+      <div class="pitch-badge"><span class="dot"></span> Live on Arc Mainnet</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">What is BachatPay?</div>
+      <p>BachatPay is a mobile-first USDC payments app built on Arc — Circle's blockchain where USDC is the native gas token. It works like GPay or PhonePe, but instead of a bank account, users connect a crypto wallet and transact in USDC with near-zero fees and sub-second finality.</p>
+      <p>It is designed for everyday Indian users — merchants, households, and savings groups — who want the benefits of stablecoins without the complexity of DeFi.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">The Problem</div>
+      <p>India has 500M+ UPI users but zero financial sovereignty. Every transaction goes through a bank, a payment processor, and a regulator. Accounts can be frozen, transfers blocked, and fees extracted at every step.</p>
+      <p>Crypto alternatives exist but are too complex, too volatile, or too expensive. There is no simple, stable, low-cost onchain payment app designed for Indian users.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Key Features</div>
+      <div class="features-grid">
+        <div class="feature-item">
+          <div class="feature-icon">💸</div>
+          <div class="feature-name">Instant USDC Payments</div>
+          <div class="feature-desc">Send to any wallet via QR scan or address. Sub-second on Arc. Gas under $0.001.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🏪</div>
+          <div class="feature-name">Merchant QR Card</div>
+          <div class="feature-desc">Shopkeepers generate a branded QR with shop name. Download PNG or print. No bank needed.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🐷</div>
+          <div class="feature-name">Bachat Vault</div>
+          <div class="feature-desc">Lock USDC toward a savings goal with a target date. 2% ragequit penalty enforced onchain.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">👥</div>
+          <div class="feature-name">Chit Fund (ROSCA)</div>
+          <div class="feature-desc">Onchain rotating savings group. 2–20 members. Transparent, trustless, automatic rotation.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">₹</div>
+          <div class="feature-name">Live INR Conversion</div>
+          <div class="feature-desc">Real-time USDC to INR rate. Enter amounts in rupees. See balance in INR instantly.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🌉</div>
+          <div class="feature-name">Auto Bridge</div>
+          <div class="feature-desc">Bridge USDC from Base, Arbitrum, Optimism or Polygon to Arc in one tap via Circle CCTP.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Smart Contracts — Arc Mainnet</div>
+      <div class="contracts">
+        <div class="contract-row">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="contract-dot"></div>
+            <div>
+              <div class="contract-name">NanoPayGateway</div>
+              <div class="contract-addr">0xa5d6C4a683d18a0f38CB68eC5345B95a17DEf306</div>
+            </div>
+          </div>
+        </div>
+        <div class="contract-row">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="contract-dot"></div>
+            <div>
+              <div class="contract-name">BachatVault</div>
+              <div class="contract-addr">0x268c18C0367b1Bafc81C53f3C3EBA81C321ec130</div>
+            </div>
+          </div>
+        </div>
+        <div class="contract-row">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="contract-dot"></div>
+            <div>
+              <div class="contract-name">ChitFund</div>
+              <div class="contract-addr">0x18129a7d1F97e4BDda369AF67925e63B01536bF9</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Stats</div>
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-val">3</div>
+          <div class="stat-label">Smart Contracts</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">&lt;$0.001</div>
+          <div class="stat-label">Gas fee on Arc</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">&lt;1s</div>
+          <div class="stat-label">Transaction time</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Tech Stack</div>
+      <p>React + TypeScript + Vite · Tailwind CSS · wagmi + ConnectKit · Circle App Kit (bridge) · Solidity (Foundry) · Arc mainnet · USDC (ERC-20) · PWA installable</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Links</div>
+      <div class="links-row">
+        <a class="link-chip" href="https://bachatpay.vercel.app">🌐 bachatpay.vercel.app</a>
+        <a class="link-chip" href="https://github.com/earnadvise/bachat-pay">💻 GitHub</a>
+        <a class="link-chip" href="https://explorer.arc.io">🔍 Arc Explorer</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ PAGE BREAK ══ -->
+  <div class="page-break"></div>
+  <div style="height:48px;"></div>
+
+  <!-- ══ VIDEO SCRIPT ══ -->
+  <div id="script">
+
+    <div class="script-header">
+      <h1>🎬 BachatPay — Demo Video Script</h1>
+      <p>60-second walkthrough · Record on phone screen</p>
+    </div>
+
+    <div class="scene scene-1">
+      <div class="scene-time" style="color:#3b82f6;">[0:00 – 0:08] Hook</div>
+      <div class="scene-action">Show: Landing page hero</div>
+      <div class="scene-text">"This is BachatPay — India's first USDC payments app built on Arc blockchain. Like GPay, but fully onchain with zero trust required."</div>
+    </div>
+
+    <div class="scene scene-2">
+      <div class="scene-time" style="color:#8b5cf6;">[0:08 – 0:18] Connect Wallet</div>
+      <div class="scene-action">Show: Tap Launch App → Connect MetaMask → balance loads</div>
+      <div class="scene-text">"Connect your MetaMask wallet on Arc mainnet. Your USDC balance loads instantly — and you can see it in Indian Rupees too."</div>
+    </div>
+
+    <div class="scene scene-3">
+      <div class="scene-time" style="color:#10b981;">[0:18 – 0:28] Send Payment</div>
+      <div class="scene-action">Show: Pay tab → scan QR or enter address → enter $0.10 → tap Pay</div>
+      <div class="scene-text">"Sending USDC is one tap. Scan a QR code or enter any wallet address. Gas fee is less than a fraction of a cent on Arc. Hit Pay — done in under a second."</div>
+    </div>
+
+    <div class="scene scene-4">
+      <div class="scene-time" style="color:#f59e0b;">[0:28 – 0:38] Merchant QR</div>
+      <div class="scene-action">Show: Receive tab → type shop name → show QR card → download PNG</div>
+      <div class="scene-text">"Any shopkeeper can generate their own payment QR with their shop name. Download it, print it, stick it at the counter. Customers scan and pay instantly — no bank account needed."</div>
+    </div>
+
+    <div class="scene scene-5">
+      <div class="scene-time" style="color:#ef4444;">[0:38 – 0:48] Vault and Chit Fund</div>
+      <div class="scene-action">Show: Vault tab briefly → Chit tab briefly</div>
+      <div class="scene-text">"Lock USDC in a savings vault toward a goal. Or start an onchain chit fund — a traditional rotating savings group, now fully transparent on the blockchain."</div>
+    </div>
+
+    <div class="scene scene-6">
+      <div class="scene-time" style="color:#06b6d4;">[0:48 – 0:58] Closing</div>
+      <div class="scene-action">Show: Home screen with balance</div>
+      <div class="scene-text">"Three smart contracts deployed on Arc mainnet. Open source on GitHub. Install it as an app on your phone right now. This is BachatPay."</div>
+    </div>
+
+    <div class="scene scene-7">
+      <div class="scene-time" style="color:#6366f1;">[0:58 – 1:00] End Card</div>
+      <div class="scene-action">Show: URL on screen</div>
+      <div class="scene-text">"bachatpay.vercel.app"</div>
+    </div>
+
+    <div class="tips">
+      <h3>Recording Tips</h3>
+      <ul>
+        <li>Record your phone screen using the built-in screen recorder</li>
+        <li>Connect your wallet before you start recording</li>
+        <li>Use a small amount like $0.10 for the demo payment</li>
+        <li>Speak slowly and clearly — pause between sections</li>
+        <li>Film in good lighting if showing your face</li>
+        <li>Total length: aim for 60–90 seconds max</li>
+      </ul>
+    </div>
+
+  </div>
+
+</div>
+</body>
+</html>
