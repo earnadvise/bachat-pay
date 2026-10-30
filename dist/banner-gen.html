@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111; display: flex; flex-direction: column; align-items: center; gap: 40px; padding: 40px; font-family: 'Space Grotesk', sans-serif; }
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800&display=swap');
+  canvas { border-radius: 12px; display: block; }
+  .label { color: #888; font-size: 13px; font-family: sans-serif; margin-top: -30px; }
+  button {
+    background: linear-gradient(135deg,#1d4ed8,#7c3aed);
+    color: white; border: none; border-radius: 10px;
+    padding: 10px 24px; font-size: 14px; font-weight: 700;
+    cursor: pointer; font-family: sans-serif;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="banner" width="1500" height="500"></canvas>
+<p class="label">X / Twitter Banner — 1500×500px</p>
+<button onclick="downloadBanner()">⬇ Download Banner PNG</button>
+
+<canvas id="pfp" width="800" height="800"></canvas>
+<p class="label">Profile Picture — 800×800px</p>
+<button onclick="downloadPfp()">⬇ Download PFP PNG</button>
+
+<script>
+// ── BANNER ────────────────────────────────────────────────────────────────────
+const banner = document.getElementById('banner')
+const bc = banner.getContext('2d')
+const BW = 1500, BH = 500
+
+// Background gradient
+const bg = bc.createLinearGradient(0, 0, BW, BH)
+bg.addColorStop(0, '#0f172a')
+bg.addColorStop(0.45, '#1e3a8a')
+bg.addColorStop(0.75, '#1d4ed8')
+bg.addColorStop(1, '#4c1d95')
+bc.fillStyle = bg
+bc.fillRect(0, 0, BW, BH)
+
+// Mesh blobs
+function blob(ctx, x, y, r, color) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+  g.addColorStop(0, color)
+  g.addColorStop(1, 'transparent')
+  ctx.fillStyle = g
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
+}
+blob(bc, 200, 100, 300, 'rgba(99,102,241,0.35)')
+blob(bc, 1300, 400, 280, 'rgba(139,92,246,0.3)')
+blob(bc, 750, 50, 200, 'rgba(59,130,246,0.2)')
+
+// Grid dots pattern
+bc.globalAlpha = 0.07
+for (let x = 40; x < BW; x += 60) {
+  for (let y = 40; y < BH; y += 60) {
+    bc.beginPath()
+    bc.arc(x, y, 2, 0, Math.PI * 2)
+    bc.fillStyle = 'white'
+    bc.fill()
+  }
+}
+bc.globalAlpha = 1
+
+// ₹ large faint watermark
+bc.font = '800 320px Arial'
+bc.fillStyle = 'rgba(255,255,255,0.04)'
+bc.textAlign = 'right'
+bc.textBaseline = 'middle'
+bc.fillText('₹', BW - 80, BH / 2 + 20)
+
+// Logo circle
+const cx = 120, cy = BH / 2
+const logoGrad = bc.createLinearGradient(cx - 48, cy - 48, cx + 48, cy + 48)
+logoGrad.addColorStop(0, '#3b82f6')
+logoGrad.addColorStop(1, '#8b5cf6')
+bc.beginPath(); bc.arc(cx, cy, 48, 0, Math.PI * 2)
+bc.fillStyle = logoGrad; bc.fill()
+bc.strokeStyle = 'rgba(255,255,255,0.3)'; bc.lineWidth = 2; bc.stroke()
+bc.font = '800 44px Arial'
+bc.fillStyle = 'white'
+bc.textAlign = 'center'
+bc.textBaseline = 'middle'
+bc.fillText('₹', cx, cy + 2)
+
+// BachatPay title
+bc.textAlign = 'left'
+bc.textBaseline = 'alphabetic'
+bc.font = '800 72px "Space Grotesk", Arial'
+bc.fillStyle = 'white'
+bc.shadowColor = 'rgba(0,0,0,0.3)'; bc.shadowBlur = 20
+bc.fillText('BachatPay', 200, BH / 2 - 10)
+bc.shadowBlur = 0
+
+// Tagline
+bc.font = '600 28px "Space Grotesk", Arial'
+bc.fillStyle = 'rgba(255,255,255,0.75)'
+bc.fillText('Send · Save · Split · Onchain', 202, BH / 2 + 42)
+
+// URL badge
+const urlX = 202, urlY = BH / 2 + 95
+bc.beginPath()
+bc.roundRect(urlX - 10, urlY - 22, 320, 36, 18)
+bc.fillStyle = 'rgba(255,255,255,0.12)'
+bc.fill()
+bc.strokeStyle = 'rgba(255,255,255,0.2)'; bc.lineWidth = 1; bc.stroke()
+bc.font = '600 15px "Space Grotesk", Arial'
+bc.fillStyle = 'rgba(255,255,255,0.85)'
+bc.fillText('🔵 bachatpay.vercel.app · Built on Arc', urlX + 4, urlY - 1)
+
+// LIVE ON ARC badge (top right)
+bc.beginPath()
+bc.roundRect(BW - 260, 30, 220, 44, 22)
+bc.fillStyle = 'rgba(74,222,128,0.15)'
+bc.fill()
+bc.strokeStyle = 'rgba(74,222,128,0.4)'; bc.lineWidth = 1.5; bc.stroke()
+bc.beginPath(); bc.arc(BW - 240, 52, 5, 0, Math.PI*2)
+bc.fillStyle = '#4ade80'
+bc.shadowColor = '#4ade80'; bc.shadowBlur = 8; bc.fill(); bc.shadowBlur = 0
+bc.font = '700 14px "Space Grotesk", Arial'
+bc.fillStyle = 'rgba(255,255,255,0.9)'
+bc.textAlign = 'left'
+bc.fillText('LIVE ON ARC MAINNET', BW - 228, 57)
+
+// Powered by Circle
+bc.font = '500 13px "Space Grotesk", Arial'
+bc.fillStyle = 'rgba(255,255,255,0.35)'
+bc.textAlign = 'right'
+bc.fillText('Powered by Circle USDC', BW - 40, BH - 24)
+
+// ── PFP ───────────────────────────────────────────────────────────────────────
+const pfp = document.getElementById('pfp')
+const pc = pfp.getContext('2d')
+const S = 800
+
+// Gradient background circle
+pc.beginPath(); pc.arc(S/2, S/2, S/2, 0, Math.PI*2)
+const pfpBg = pc.createLinearGradient(0, 0, S, S)
+pfpBg.addColorStop(0, '#1e3a8a')
+pfpBg.addColorStop(0.5, '#1d4ed8')
+pfpBg.addColorStop(1, '#4c1d95')
+pc.fillStyle = pfpBg; pc.fill()
+
+// Glow blob
+blob(pc, S*0.3, S*0.3, 300, 'rgba(99,102,241,0.4)')
+blob(pc, S*0.7, S*0.7, 280, 'rgba(139,92,246,0.35)')
+
+// Outer ring
+pc.beginPath(); pc.arc(S/2, S/2, S/2 - 6, 0, Math.PI*2)
+pc.strokeStyle = 'rgba(255,255,255,0.15)'; pc.lineWidth = 12; pc.stroke()
+
+// Inner white circle for contrast
+pc.beginPath(); pc.arc(S/2, S/2, 240, 0, Math.PI*2)
+pc.fillStyle = 'rgba(255,255,255,0.08)'; pc.fill()
+pc.strokeStyle = 'rgba(255,255,255,0.2)'; pc.lineWidth = 2; pc.stroke()
+
+// ₹ symbol
+pc.font = '800 320px Arial'
+pc.fillStyle = 'white'
+pc.textAlign = 'center'
+pc.textBaseline = 'middle'
+pc.shadowColor = 'rgba(59,130,246,0.6)'; pc.shadowBlur = 40
+pc.fillText('₹', S/2, S/2 + 10)
+pc.shadowBlur = 0
+
+// BachatPay text below
+pc.font = '700 52px "Space Grotesk", Arial'
+pc.fillStyle = 'rgba(255,255,255,0.85)'
+pc.textAlign = 'center'
+pc.textBaseline = 'alphabetic'
+pc.fillText('BachatPay', S/2, S/2 + 220)
+
+// download helpers
+function downloadBanner() {
+  const a = document.createElement('a')
+  a.download = 'bachatpay-banner.png'
+  a.href = banner.toDataURL('image/png')
+  a.click()
+}
+function downloadPfp() {
+  const a = document.createElement('a')
+  a.download = 'bachatpay-pfp.png'
+  a.href = pfp.toDataURL('image/png')
+  a.click()
+}
+</script>
+</body>
+</html>
