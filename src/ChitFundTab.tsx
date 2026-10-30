@@ -5,7 +5,7 @@
  */
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
-import { erc20Abi, parseUnits, formatUnits, isAddress } from 'viem'
+import { erc20Abi, parseUnits, formatUnits, isAddress, encodeFunctionData, decodeFunctionResult } from 'viem'
 import { toast } from 'sonner'
 import { Users, Loader2, ExternalLink, CheckCircle2, Gift, ArrowLeft, Copy } from 'lucide-react'
 import { CONTRACTS, CHIT_FUND_ABI } from './contracts'
@@ -42,7 +42,7 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
   const [roundDays, setRoundDays] = useState('7')
   const [fundIdInput, setFundIdInput] = useState('')
   const [selectedFund, setSelectedFund] = useState<FundInfo | null>(null)
-  const [myFunds, _setMyFunds] = useState<FundInfo[]>([])
+  const [myFunds, setMyFundsState] = useState<FundInfo[]>([])
   const [loadingFunds, setLoadingFunds] = useState(false)
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>()
   const [pendingAction, setPendingAction] = useState('')
@@ -77,34 +77,47 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
     query: { enabled: !!address },
   })
 
-  // Load user's funds by scanning all fund IDs
+  // Load user's funds by scanning all fund IDs via RPC batch
   const loadMyFunds = useCallback(async () => {
-    if (!address || !totalFunds) return
+    if (!address || totalFunds === undefined) return
     setLoadingFunds(true)
     const total = Number(totalFunds)
     const found: FundInfo[] = []
-    // Read up to last 50 funds
-    const start = Math.max(0, total - 50)
-    for (let i = start; i < total; i++) {
-      try {
-        const res = await fetch(`https://rpc.mainnet.arc.io`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0', id: i, method: 'eth_call',
-            params: [{
-              to: FUND_ADDR,
-              data: encodeFunctionCall('getFund', [BigInt(i)])
-            }, 'latest']
-          })
-        })
-        // fallback: just use wagmi read below
-        void res
-      } catch { /* ignore */ }
-    }
-    // Use wagmi approach — read each fund and filter
+    const start = Math.max(0, total - 100)
+    // Batch all calls in one JSON-RPC batch request
+    const batch = Array.from({ length: total - start }, (_, idx) => ({
+      jsonrpc: '2.0',
+      id: start + idx,
+      method: 'eth_call',
+      params: [{
+        to: FUND_ADDR,
+        data: encodeFunctionData({ abi: CHIT_FUND_ABI, functionName: 'getFund', args: [BigInt(start + idx)] })
+      }, 'latest']
+    }))
+    try {
+      const resp = await fetch('https://rpc.mainnet.arc.io', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batch)
+      })
+      const results: { id: number; result?: string; error?: unknown }[] = await resp.json() as { id: number; result?: string; error?: unknown }[]
+      for (const r of results) {
+        if (!r.result || r.result === '0x') continue
+        try {
+          const decoded = decodeFunctionResult({ abi: CHIT_FUND_ABI, functionName: 'getFund', data: r.result as `0x${string}` }) as {
+            admin: string; name: string; contributionAmount: bigint; currentRound: bigint;
+            totalRounds: bigint; active: boolean; members: string[]; roundDeadline: bigint; roundDuration: bigint
+          }
+          const isMember = decoded.members.some(m => m.toLowerCase() === address.toLowerCase())
+          if (isMember) {
+            found.push({ id: r.id, ...decoded })
+          }
+        } catch { /* skip malformed */ }
+      }
+    } catch { /* network error */ }
+    // Update state — replace internal setter
     setLoadingFunds(false)
-    return found
+    setMyFundsState(found)
   }, [address, totalFunds])
 
   useEffect(() => {
@@ -283,25 +296,43 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
         </div>
       )}
 
+      {!loadingFunds && address && myFunds.length === 0 && (
+        <div className="rounded-2xl p-4 text-center" style={{ background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(124,58,237,0.04)', border: '1px dashed rgba(124,58,237,0.3)' }}>
+          <p className="text-2xl mb-1">🔍</p>
+          <p className="text-sm font-medium" style={{ color: textMuted }}>No committees found for your wallet yet.</p>
+          <p className="text-xs mt-1" style={{ color: textMuted }}>Start a new one or ask your organizer for the Committee ID.</p>
+        </div>
+      )}
+
       {myFunds.length > 0 && (
         <div style={card}>
           <h3 className="font-bold mb-3" style={{ color: textMain }}>Your Committees</h3>
           {myFunds.map(f => (
-            <button
-              key={f.id}
-              onClick={() => { setSelectedFund(f); setView('detail') }}
-              className="w-full text-left p-3 rounded-xl mb-2 flex items-center justify-between"
-              style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)' }}
-            >
-              <div>
-                <p className="font-semibold text-sm" style={{ color: textMain }}>{f.name}</p>
-                <p className="text-xs mt-0.5" style={{ color: textMuted }}>{f.members.length} members · Round {Number(f.currentRound) + 1}/{Number(f.totalRounds)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold" style={{ color: '#7c3aed' }}>${fmt(f.contributionAmount)}</p>
-                <p className="text-xs" style={{ color: textMuted }}>per round</p>
-              </div>
-            </button>
+            <div key={f.id} className="rounded-xl mb-2 overflow-hidden" style={{ border: '1px solid rgba(124,58,237,0.2)' }}>
+              <button
+                onClick={() => { setSelectedFund(f); setView('detail') }}
+                className="w-full text-left p-3 flex items-center justify-between"
+                style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(124,58,237,0.04)' }}
+              >
+                <div>
+                  <p className="font-semibold text-sm" style={{ color: textMain }}>{f.name}</p>
+                  <p className="text-xs mt-0.5" style={{ color: textMuted }}>
+                    {f.members.length} members · Round {Number(f.currentRound) + 1}/{Number(f.totalRounds)} · ID: <span className="font-bold" style={{ color: '#7c3aed' }}>{f.id}</span>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold" style={{ color: '#7c3aed' }}>${fmt(f.contributionAmount)}</p>
+                  <p className="text-xs" style={{ color: textMuted }}>per round</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { setFundIdInput(String(f.id)); setContribution(formatUnits(f.contributionAmount, USDC_DECIMALS)); setView('join') }}
+                className="w-full py-2 text-sm font-bold text-white"
+                style={{ background: 'linear-gradient(135deg,#7c3aed,#6d28d9)' }}
+              >
+                💸 Pay My Round (${fmt(f.contributionAmount)})
+              </button>
+            </div>
           ))}
         </div>
       )}
