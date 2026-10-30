@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>BachatPay — Circle Integration Screenshots</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f172a; font-family: 'Fira Code', 'Courier New', monospace; padding: 32px; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; margin-bottom: 32px; overflow: hidden; }
+  .card-header { background: #0f172a; padding: 14px 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #334155; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .title { color: #94a3b8; font-size: 13px; font-family: sans-serif; font-weight: 600; margin-left: 8px; }
+  .badge { margin-left: auto; background: linear-gradient(135deg,#1d4ed8,#7c3aed); color: white; font-size: 11px; font-family: sans-serif; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+  pre { padding: 24px; font-size: 13px; line-height: 1.7; overflow-x: auto; color: #e2e8f0; }
+  .kw { color: #c084fc; }
+  .str { color: #86efac; }
+  .fn { color: #60a5fa; }
+  .cm { color: #475569; }
+  .var { color: #f9a8d4; }
+  .num { color: #fb923c; }
+  .label { font-family: sans-serif; font-size: 22px; font-weight: 800; color: white; text-align: center; margin-bottom: 8px; }
+  .sublabel { font-family: sans-serif; font-size: 14px; color: #64748b; text-align: center; margin-bottom: 32px; }
+  .section-title { font-family: sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #3b82f6; text-transform: uppercase; margin-bottom: 12px; padding-left: 4px; }
+</style>
+</head>
+<body>
+
+<div class="label">BachatPay — Circle Product Integrations</div>
+<div class="sublabel">Code evidence for grant submission · github.com/earnadvise/bachat-pay</div>
+
+<!-- Screenshot 1 -->
+<div class="section-title">Screenshot 1 of 3 — Circle App Kit (Bridge)</div>
+<div class="card">
+  <div class="card-header">
+    <div class="dot" style="background:#ef4444"></div>
+    <div class="dot" style="background:#f59e0b"></div>
+    <div class="dot" style="background:#22c55e"></div>
+    <span class="title">src/App.tsx — Circle App Kit bridge integration</span>
+    <span class="badge">Circle App Kit</span>
+  </div>
+  <pre><span class="cm">// Circle App Kit import — top of src/App.tsx</span>
+<span class="kw">import</span> { <span class="var">AppKit</span> } <span class="kw">from</span> <span class="str">'@circle-fin/app-kit'</span>
+<span class="kw">import</span> { <span class="var">createViemAdapterFromProvider</span> } <span class="kw">from</span> <span class="str">'@circle-fin/adapter-viem-v2'</span>
+
+<span class="cm">// AppKit instance</span>
+<span class="kw">const</span> <span class="var">appKit</span> = <span class="kw">new</span> <span class="fn">AppKit</span>()
+
+<span class="cm">// Bridge handler — called when user taps Bridge button</span>
+<span class="kw">const</span> <span class="var">handleBridge</span> = <span class="fn">useCallback</span>(<span class="kw">async</span> () => {
+  <span class="kw">const</span> <span class="var">adapter</span> = <span class="kw">await</span> <span class="fn">createViemAdapterFromProvider</span>({ provider: rawProvider })
+  <span class="kw">await</span> <span class="var">appKit</span>.<span class="fn">bridge</span>({
+    token: <span class="str">'USDC'</span>,
+    from: { adapter, chain: bridgeFrom.kitName },
+    to:   { adapter, chain: <span class="str">'Arc'</span> },
+    amount: bridgeAmount,
+  })
+  <span class="fn">toast</span>.<span class="fn">success</span>(<span class="str">`Bridged ${bridgeAmount} USDC to Arc!`</span>)
+}, [connectorClient, bridgeAmount, bridgeFrom])</pre>
+</div>
+
+<!-- Screenshot 2 -->
+<div class="section-title">Screenshot 2 of 3 — USDC on Arc (Circle Stablecoin)</div>
+<div class="card">
+  <div class="card-header">
+    <div class="dot" style="background:#ef4444"></div>
+    <div class="dot" style="background:#f59e0b"></div>
+    <div class="dot" style="background:#22c55e"></div>
+    <span class="title">src/App.tsx — USDC contract address + balance read</span>
+    <span class="badge">USDC on Arc</span>
+  </div>
+  <pre><span class="cm">// USDC is the native gas token on Arc mainnet</span>
+<span class="cm">// ERC-20 address used for all transfers, approvals, and balance reads</span>
+<span class="kw">const</span> <span class="var">USDC_ADDRESS</span> = <span class="str">'0x3600000000000000000000000000000000000000'</span> <span class="kw">as const</span>
+<span class="kw">const</span> <span class="var">USDC_DECIMALS</span> = <span class="num">6</span>
+<span class="kw">const</span> <span class="var">ARC_CHAIN_ID</span>  = <span class="num">5042</span> <span class="cm">// Arc mainnet</span>
+
+<span class="cm">// Read USDC balance via ERC-20 balanceOf</span>
+<span class="kw">const</span> { data: <span class="var">usdcBalance</span> } = <span class="fn">useReadContract</span>({
+  address:      <span class="var">USDC_ADDRESS</span>,
+  abi:          <span class="var">erc20Abi</span>,
+  functionName: <span class="str">'balanceOf'</span>,
+  args:         [address],
+  chainId:      <span class="var">ARC_CHAIN_ID</span>,
+})
+
+<span class="cm">// Send USDC via ERC-20 transfer</span>
+<span class="kw">const</span> { <span class="fn">writeContractAsync</span> } = <span class="fn">useWriteContract</span>()
+<span class="kw">await</span> <span class="fn">writeContractAsync</span>({
+  address:      <span class="var">USDC_ADDRESS</span>,
+  abi:          <span class="var">erc20Abi</span>,
+  functionName: <span class="str">'transfer'</span>,
+  args:         [payTo, <span class="fn">parseUnits</span>(payAmount, <span class="var">USDC_DECIMALS</span>)],
+  chainId:      <span class="var">ARC_CHAIN_ID</span>,
+})</pre>
+</div>
+
+<!-- Screenshot 3 -->
+<div class="section-title">Screenshot 3 of 3 — Circle Smart Contract Platform (Deployed Contracts)</div>
+<div class="card">
+  <div class="card-header">
+    <div class="dot" style="background:#ef4444"></div>
+    <div class="dot" style="background:#f59e0b"></div>
+    <div class="dot" style="background:#22c55e"></div>
+    <span class="title">contracts/contract-metadata/NanoPayGateway.json — SCP deployment record</span>
+    <span class="badge">Circle SCP</span>
+  </div>
+  <pre>{
+  <span class="str">"contractName"</span>:    <span class="str">"NanoPayGateway"</span>,
+  <span class="str">"contractAddress"</span>: <span class="str">"0xa5d6C4a683d18a0f38CB68eC5345B95a17DEf306"</span>,
+  <span class="str">"chain"</span>:           <span class="str">"ARC-MAINNET"</span>,
+  <span class="str">"deployedAt"</span>:      <span class="str">"2026"</span>,
+  <span class="str">"explorer"</span>:        <span class="str">"https://explorer.arc.io/address/0xa5d6C4a683d18a0f38CB68eC5345B95a17DEf306"</span>
+}
+
+<span class="cm">// BachatVault</span>
+<span class="str">"contractAddress"</span>: <span class="str">"0x268c18C0367b1Bafc81C53f3C3EBA81C321ec130"</span>
+<span class="str">"explorer"</span>:        <span class="str">"https://explorer.arc.io/address/0x268c18C0367b1Bafc81C53f3C3EBA81C321ec130"</span>
+
+<span class="cm">// ChitFund</span>
+<span class="str">"contractAddress"</span>: <span class="str">"0x18129a7d1F97e4BDda369AF67925e63B01536bF9"</span>
+<span class="str">"explorer"</span>:        <span class="str">"https://explorer.arc.io/address/0x18129a7d1F97e4BDda369AF67925e63B01536bF9"</span></pre>
+</div>
+
+</body>
+</html>

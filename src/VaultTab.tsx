@@ -40,6 +40,8 @@ export default function VaultTab({ toInr }: Props) {
   const [depositAmt, setDepositAmt] = useState('')
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>()
   const [pendingAction, setPendingAction] = useState<string>('')
+  // after approve confirms, we fire deposit automatically
+  const pendingDepositRef = useRef<{ vaultId: string; amt: string } | null>(null)
 
   const { writeContractAsync } = useWriteContract()
   const { data: vaultIds, refetch: refetchIds } = useReadContract({
@@ -56,15 +58,43 @@ export default function VaultTab({ toInr }: Props) {
   useEffect(() => {
     if (!txConfirmed || !txHash || confirmedRef.current) return
     confirmedRef.current = true
-    toast.success('Transaction confirmed!')
+
+    // if approval just confirmed, fire the deposit now
+    if (pendingAction === 'approve' && pendingDepositRef.current) {
+      const { vaultId, amt } = pendingDepositRef.current
+      setPendingAction('deposit')
+      setTxHash(undefined)
+      writeContractAsync({
+        address: VAULT_ADDR,
+        abi: BACHAT_VAULT_ABI,
+        functionName: 'deposit',
+        args: [BigInt(vaultId), parseUnits(amt, USDC_DECIMALS)],
+        chainId: ARC_CHAIN_ID,
+      }).then(hash => {
+        toast('Depositing USDC…')
+        setTxHash(hash)
+        pendingDepositRef.current = null
+        confirmedRef.current = false
+      }).catch(e => {
+        toast.error((e as Error).message?.slice(0, 80) ?? 'Deposit failed')
+        setPendingAction('')
+        pendingDepositRef.current = null
+        confirmedRef.current = false
+      })
+      return
+    }
+
+    toast.success(pendingAction === 'deposit' ? 'Deposited!' : 'Transaction confirmed!')
     void refetchIds()
     queueMicrotask(() => {
       setPendingAction('')
       setTxHash(undefined)
+      setDepositAmt('')
+      setDepositVaultId('')
       setView('list')
       confirmedRef.current = false
     })
-  }, [txConfirmed, txHash, refetchIds])
+  }, [txConfirmed, txHash, refetchIds, pendingAction, writeContractAsync])
 
   const handleCreate = useCallback(async () => {
     if (!goalName || !address) return
@@ -91,6 +121,8 @@ export default function VaultTab({ toInr }: Props) {
     if (!depositVaultId || !depositAmt || !address) return
     try {
       setPendingAction('approve')
+      // store vault + amount so deposit fires automatically after approval
+      pendingDepositRef.current = { vaultId: depositVaultId, amt: depositAmt }
       const hash = await writeContractAsync({
         address: USDC_MAINNET,
         abi: erc20Abi,
@@ -99,10 +131,11 @@ export default function VaultTab({ toInr }: Props) {
         chainId: ARC_CHAIN_ID,
       })
       setTxHash(hash)
-      toast('Approving USDC…')
+      toast('Step 1/2: Approving USDC…')
     } catch (e) {
       toast.error((e as Error).message?.slice(0, 80) ?? 'Failed')
       setPendingAction('')
+      pendingDepositRef.current = null
     }
   }, [depositVaultId, depositAmt, address, writeContractAsync])
 
@@ -198,7 +231,9 @@ export default function VaultTab({ toInr }: Props) {
           className="w-full py-3 rounded-xl font-semibold text-white flex items-center justify-center gap-2"
           style={{ background: !depositVaultId || !depositAmt || !isConnected ? '#94a3b8' : 'linear-gradient(135deg,#2563eb,#1d4ed8)' }}
         >
-          {pendingAction === 'approve' ? <><Loader2 size={18} className="animate-spin" /> Approving…</> : <><Lock size={18} /> Approve & Deposit</>}
+          {pendingAction === 'approve' ? <><Loader2 size={18} className="animate-spin" /> Step 1/2: Approving…</>
+            : pendingAction === 'deposit' ? <><Loader2 size={18} className="animate-spin" /> Step 2/2: Depositing…</>
+            : <><Lock size={18} /> Approve &amp; Deposit</>}
         </button>
       </div>
 
