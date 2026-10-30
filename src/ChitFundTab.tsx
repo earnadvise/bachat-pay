@@ -621,6 +621,9 @@ function DetailView({ fund, address, card, textMain, textMuted, darkMode, toInr,
       setLoadingStatus(false)
     }
     void fetchStatus()
+    // Auto-refresh every 15 seconds so friends' payments show up live
+    const interval = setInterval(() => { void fetchStatus() }, 15000)
+    return () => clearInterval(interval)
   }, [fund])
 
   const recipientIdx = Number(fund.currentRound) % fund.members.length
