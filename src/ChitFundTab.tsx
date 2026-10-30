@@ -335,8 +335,25 @@ export default function ChitFundTab({ toInr, darkMode, resolveLabel: resolveLabe
                   <p className="font-bold text-base" style={{ color: textMain }}>{f.name}</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(124,58,237,0.15)', color: '#7c3aed' }}>ID: {f.id}</span>
-                    <span className="text-xs" style={{ color: textMuted }}>{f.members.length} members</span>
                     <span className="text-xs" style={{ color: textMuted }}>Round {Number(f.currentRound) + 1}/{Number(f.totalRounds)}</span>
+                  </div>
+                  {/* Member list */}
+                  <div className="mt-2 flex flex-col gap-1">
+                    {f.members.map((m, i) => {
+                      const isMe = m.toLowerCase() === address?.toLowerCase()
+                      const label = resolveLabel ? resolveLabel(m) : null
+                      return (
+                        <div key={m} className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold" style={{ color: '#7c3aed', minWidth: 20 }}>#{i + 1}</span>
+                          <span className="text-xs font-mono" style={{ color: isMe ? '#22c55e' : textMuted }}>
+                            {label && label !== m.slice(0,6)+'…'+m.slice(-4)
+                              ? label
+                              : `${m.slice(0,8)}…${m.slice(-6)}`}
+                            {isMe && <span className="ml-1 font-bold" style={{ color: '#22c55e' }}>(You)</span>}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
                 <div className="text-right ml-2">
