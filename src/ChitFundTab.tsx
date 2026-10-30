@@ -49,6 +49,7 @@ export default function ChitFundTab({ toInr, darkMode, resolveLabel: resolveLabe
   const [pendingAction, setPendingAction] = useState('')
   const pendingContributeRef = useRef<{ fundId: number; amount: string } | null>(null)
   const [newFundId, setNewFundId] = useState<number | null>(null)
+  const [newFundName, setNewFundName] = useState('')
 
   const card = darkMode
     ? { background: 'rgba(30,41,59,0.9)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: 20 } as React.CSSProperties
@@ -122,8 +123,12 @@ export default function ChitFundTab({ toInr, darkMode, resolveLabel: resolveLabe
   }, [address, totalFunds])
 
   useEffect(() => {
-    if (!address || totalFunds === undefined) return
+    if (!address) return
+    // Fire immediately when address is available, even if totalFunds is still loading
     void loadMyFunds()
+    // Also set up a refresh every 30s so new funds appear automatically
+    const iv = setInterval(() => { void loadMyFunds() }, 30000)
+    return () => clearInterval(iv)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, String(totalFunds)])
 
@@ -168,6 +173,7 @@ export default function ChitFundTab({ toInr, darkMode, resolveLabel: resolveLabe
       if (wasCreate && result.data !== undefined) {
         // new fund ID = totalFunds - 1 (0-indexed)
         setNewFundId(Number(result.data) - 1)
+        setNewFundName(fundName)
       }
       confirmedRef.current = false
       void refetchTotal()
@@ -246,10 +252,19 @@ export default function ChitFundTab({ toInr, darkMode, resolveLabel: resolveLabe
     <div className="pb-24 px-4 pt-4 space-y-4 max-w-md mx-auto">
 
       {/* Header */}
-      <div className="text-center py-2">
-        <div className="text-4xl mb-1">🤝</div>
-        <h2 className="text-xl font-bold" style={{ color: textMain }}>Committee / Chit Fund</h2>
-        <p className="text-sm mt-1" style={{ color: textMuted }}>Group savings — everyone pays, one person gets the full amount each round</p>
+      <div className="flex items-center justify-between py-2">
+        <div>
+          <h2 className="text-xl font-bold" style={{ color: textMain }}>🤝 Committee / Chit Fund</h2>
+          <p className="text-sm mt-0.5" style={{ color: textMuted }}>Everyone pays, one person gets the full amount each round</p>
+        </div>
+        <button
+          onClick={() => { void loadMyFunds(); void refetchTotal() }}
+          className="p-2 rounded-xl text-sm font-medium flex items-center gap-1"
+          style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(124,58,237,0.08)', color: '#7c3aed' }}
+          title="Refresh committees"
+        >
+          {loadingFunds ? <Loader2 size={16} className="animate-spin" /> : '🔄'}
+        </button>
       </div>
 
       {/* New fund created banner */}
@@ -257,6 +272,7 @@ export default function ChitFundTab({ toInr, darkMode, resolveLabel: resolveLabe
         <div className="rounded-2xl p-4 text-center" style={{ background: 'linear-gradient(135deg,#7c3aed,#6d28d9)' }}>
           <div className="text-2xl mb-1">🎉</div>
           <p className="text-white font-bold text-lg">Committee Created!</p>
+          {newFundName && <p className="text-purple-100 font-bold text-xl mb-1">"{newFundName}"</p>}
           <p className="text-purple-200 text-sm mb-1">Share this ID with all members</p>
           <div className="flex items-center justify-center gap-2 my-2">
             <span className="text-white font-black text-4xl">{newFundId}</span>
@@ -307,22 +323,24 @@ export default function ChitFundTab({ toInr, darkMode, resolveLabel: resolveLabe
 
       {myFunds.length > 0 && (
         <div style={card}>
-          <h3 className="font-bold mb-3" style={{ color: textMain }}>Your Committees</h3>
+          <h3 className="font-bold mb-3" style={{ color: textMain }}>Your Committees ({myFunds.length})</h3>
           {myFunds.map(f => (
-            <div key={f.id} className="rounded-xl mb-2 overflow-hidden" style={{ border: '1px solid rgba(124,58,237,0.2)' }}>
+            <div key={f.id} className="rounded-xl mb-3 overflow-hidden" style={{ border: '1.5px solid rgba(124,58,237,0.25)' }}>
               <button
                 onClick={() => { setSelectedFund(f); setView('detail') }}
-                className="w-full text-left p-3 flex items-center justify-between"
-                style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(124,58,237,0.04)' }}
+                className="w-full text-left p-4 flex items-center justify-between"
+                style={{ background: darkMode ? 'rgba(124,58,237,0.12)' : 'rgba(124,58,237,0.06)' }}
               >
-                <div>
-                  <p className="font-semibold text-sm" style={{ color: textMain }}>{f.name}</p>
-                  <p className="text-xs mt-0.5" style={{ color: textMuted }}>
-                    {f.members.length} members · Round {Number(f.currentRound) + 1}/{Number(f.totalRounds)} · ID: <span className="font-bold" style={{ color: '#7c3aed' }}>{f.id}</span>
-                  </p>
+                <div className="flex-1">
+                  <p className="font-bold text-base" style={{ color: textMain }}>{f.name}</p>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(124,58,237,0.15)', color: '#7c3aed' }}>ID: {f.id}</span>
+                    <span className="text-xs" style={{ color: textMuted }}>{f.members.length} members</span>
+                    <span className="text-xs" style={{ color: textMuted }}>Round {Number(f.currentRound) + 1}/{Number(f.totalRounds)}</span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold" style={{ color: '#7c3aed' }}>${fmt(f.contributionAmount)}</p>
+                <div className="text-right ml-2">
+                  <p className="text-base font-bold" style={{ color: '#7c3aed' }}>${fmt(f.contributionAmount)}</p>
                   <p className="text-xs" style={{ color: textMuted }}>per round</p>
                 </div>
               </button>
