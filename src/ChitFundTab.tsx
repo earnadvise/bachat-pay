@@ -47,6 +47,7 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>()
   const [pendingAction, setPendingAction] = useState('')
   const pendingContributeRef = useRef<{ fundId: number; amount: string } | null>(null)
+  const [newFundId, setNewFundId] = useState<number | null>(null)
 
   const card = darkMode
     ? { background: 'rgba(30,41,59,0.9)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: 20 } as React.CSSProperties
@@ -142,12 +143,18 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
       return
     }
 
+    const wasCreate = pendingAction === 'create'
     toast.success('Done! Transaction confirmed.')
-    queueMicrotask(() => {
+    queueMicrotask(async () => {
       setPendingAction('')
       setTxHash(undefined)
       setView('home')
       setFundName(''); setContribution(''); setMembers(''); setFundIdInput('')
+      const result = await refetchTotal()
+      if (wasCreate && result.data !== undefined) {
+        // new fund ID = totalFunds - 1 (0-indexed)
+        setNewFundId(Number(result.data) - 1)
+      }
       confirmedRef.current = false
       void refetchTotal()
       void refetchClaim()
@@ -155,9 +162,11 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
   }, [txConfirmed, txHash, pendingAction, writeContractAsync, refetchTotal, refetchClaim])
 
   const handleCreate = useCallback(async () => {
-    if (!fundName || !contribution || !members) return
-    const memberList = members.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
-    if (memberList.length < 2) { toast.error('Add at least 2 member wallet addresses'); return }
+    if (!fundName || !contribution || !address) return
+    // Always include creator's own wallet, then add others
+    const otherList = members.split(/[\n,]+/).map(s => s.trim()).filter(Boolean).filter(m => m.toLowerCase() !== address.toLowerCase())
+    const memberList = [address, ...otherList]
+    if (memberList.length < 2) { toast.error('Add at least one other member wallet address'); return }
     if (memberList.length > 20) { toast.error('Maximum 20 members allowed'); return }
     if (memberList.some(m => !isAddress(m))) { toast.error('One of the addresses looks wrong — check and try again'); return }
     try {
@@ -175,7 +184,7 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
       toast.error((e as Error).message?.slice(0, 80) ?? 'Failed')
       setPendingAction('')
     }
-  }, [fundName, contribution, members, roundDays, writeContractAsync])
+  }, [fundName, contribution, members, roundDays, address, writeContractAsync])
 
   const handleContribute = useCallback(async (fundId: number, amount: string) => {
     try {
@@ -228,6 +237,26 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
         <h2 className="text-xl font-bold" style={{ color: textMain }}>Committee / Chit Fund</h2>
         <p className="text-sm mt-1" style={{ color: textMuted }}>Group savings — everyone pays, one person gets the full amount each round</p>
       </div>
+
+      {/* New fund created banner */}
+      {newFundId !== null && (
+        <div className="rounded-2xl p-4 text-center" style={{ background: 'linear-gradient(135deg,#7c3aed,#6d28d9)' }}>
+          <div className="text-2xl mb-1">🎉</div>
+          <p className="text-white font-bold text-lg">Committee Created!</p>
+          <p className="text-purple-200 text-sm mb-1">Share this ID with all members</p>
+          <div className="flex items-center justify-center gap-2 my-2">
+            <span className="text-white font-black text-4xl">{newFundId}</span>
+          </div>
+          <button
+            onClick={() => { void navigator.clipboard.writeText(String(newFundId)); toast.success('Committee ID copied!') }}
+            className="px-6 py-2 rounded-xl font-bold text-purple-700 bg-white text-sm flex items-center gap-2 mx-auto mb-2"
+          >
+            <Copy size={14} /> Copy Committee ID
+          </button>
+          <p className="text-purple-200 text-xs">Tell everyone: "Our Committee ID is {newFundId} — download BachatPay and pay your round"</p>
+          <button onClick={() => setNewFundId(null)} className="mt-2 text-purple-300 text-xs underline">Dismiss</button>
+        </div>
+      )}
 
       {/* Claim banner */}
       {parseFloat(claimAmt) > 0 && (
@@ -375,17 +404,20 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
 
         {/* Members */}
         <div>
-          <label className="text-sm font-bold block mb-1" style={{ color: textMain }}>Member Wallet Addresses</label>
-          <p className="text-xs mb-2" style={{ color: textMuted }}>Add all members including yourself. One address per line. (2 to 20 people)</p>
+          <label className="text-sm font-bold block mb-1" style={{ color: textMain }}>Other Members' Wallet Addresses</label>
+          <div className="rounded-xl px-3 py-2 mb-2 text-xs font-medium" style={{ background: 'rgba(124,58,237,0.1)', color: '#7c3aed' }}>
+            ✅ Your wallet is automatically added as Member 1
+          </div>
+          <p className="text-xs mb-2" style={{ color: textMuted }}>Add your friends' wallet addresses below. One per line. (Need at least 1 other person)</p>
           <textarea
             className="w-full rounded-xl px-4 py-3 text-xs outline-none resize-none font-mono"
             style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)', border: '1.5px solid rgba(124,58,237,0.2)', color: textMain }}
-            rows={5}
-            placeholder={'0xYourAddress\n0xFriend1Address\n0xFriend2Address'}
+            rows={4}
+            placeholder={'0xFriend1Address\n0xFriend2Address\n0xFriend3Address'}
             value={members}
             onChange={e => setMembers(e.target.value)}
           />
-          {memberCount >= 2 && <p className="text-xs mt-1 font-medium" style={{ color: '#7c3aed' }}>{memberCount} members added</p>}
+          {memberCount >= 1 && <p className="text-xs mt-1 font-medium" style={{ color: '#7c3aed' }}>{memberCount + 1} total members (you + {memberCount})</p>}
         </div>
 
         {/* Round duration */}
@@ -404,9 +436,9 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
 
         <button
           onClick={() => void handleCreate()}
-          disabled={!fundName || !contribution || memberCount < 2 || !isConnected || !!pendingAction}
+          disabled={!fundName || !contribution || memberCount < 1 || !isConnected || !!pendingAction}
           className="w-full py-4 rounded-xl font-bold text-white text-base flex items-center justify-center gap-2"
-          style={{ background: !fundName || !contribution || memberCount < 2 || !isConnected ? '#94a3b8' : 'linear-gradient(135deg,#7c3aed,#6d28d9)' }}
+          style={{ background: !fundName || !contribution || memberCount < 1 || !isConnected ? '#94a3b8' : 'linear-gradient(135deg,#7c3aed,#6d28d9)' }}
         >
           {pendingAction === 'create'
             ? <><Loader2 size={20} className="animate-spin" /> Creating…</>
