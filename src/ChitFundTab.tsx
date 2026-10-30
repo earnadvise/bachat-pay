@@ -546,66 +546,208 @@ export default function ChitFundTab({ toInr, darkMode }: Props) {
 
   // --- DETAIL VIEW ---
   if (view === 'detail' && selectedFund) return (
-    <div className="pb-24 px-4 pt-4 space-y-4 max-w-md mx-auto">
-      <button onClick={() => setView('home')} className="flex items-center gap-2 text-sm font-medium" style={{ color: '#7c3aed' }}>
-        <ArrowLeft size={16} /> Back
-      </button>
-
-      <div style={card}>
-        <h2 className="text-lg font-bold mb-1" style={{ color: textMain }}>{selectedFund.name}</h2>
-        <p className="text-sm mb-4" style={{ color: textMuted }}>Fund ID: {selectedFund.id}</p>
-
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="rounded-xl p-3 text-center" style={{ background: darkMode ? 'rgba(124,58,237,0.15)' : 'rgba(124,58,237,0.07)' }}>
-            <p className="text-xs" style={{ color: textMuted }}>Each person pays</p>
-            <p className="text-lg font-bold" style={{ color: '#7c3aed' }}>${fmt(selectedFund.contributionAmount)}</p>
-            <p className="text-xs" style={{ color: textMuted }}>{toInr(fmt(selectedFund.contributionAmount))}</p>
-          </div>
-          <div className="rounded-xl p-3 text-center" style={{ background: darkMode ? 'rgba(22,163,74,0.15)' : 'rgba(22,163,74,0.07)' }}>
-            <p className="text-xs" style={{ color: textMuted }}>Round</p>
-            <p className="text-lg font-bold" style={{ color: '#16a34a' }}>{Number(selectedFund.currentRound) + 1} / {Number(selectedFund.totalRounds)}</p>
-            <p className="text-xs" style={{ color: textMuted }}>{selectedFund.members.length} members</p>
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <p className="text-sm font-bold mb-2" style={{ color: textMain }}>Members</p>
-          {selectedFund.members.map((m, i) => (
-            <div key={m} className="flex items-center justify-between py-2 border-b" style={{ borderColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }}>
-              <p className="text-xs font-mono" style={{ color: textMuted }}>{m.slice(0, 10)}…{m.slice(-6)}</p>
-              <div className="flex items-center gap-2">
-                {m.toLowerCase() === selectedFund.members[Number(selectedFund.currentRound) % selectedFund.members.length]?.toLowerCase() && (
-                  <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(22,163,74,0.15)', color: '#16a34a' }}>Gets pot</span>
-                )}
-                <span className="text-xs" style={{ color: textMuted }}>#{i + 1}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <button
-          onClick={() => { setFundIdInput(String(selectedFund.id)); setContribution(fmt(selectedFund.contributionAmount)); setView('join') }}
-          className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2"
-          style={{ background: 'linear-gradient(135deg,#16a34a,#15803d)' }}
-        >
-          💸 Pay This Round
-        </button>
-
-        <button
-          onClick={() => { void navigator.clipboard.writeText(String(selectedFund.id)); toast.success('Fund ID copied!') }}
-          className="w-full py-3 rounded-xl font-semibold mt-2 flex items-center justify-center gap-2"
-          style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(124,58,237,0.08)', color: '#7c3aed' }}
-        >
-          <Copy size={16} /> Copy Fund ID to share
-        </button>
-      </div>
-    </div>
+    <DetailView
+      fund={selectedFund}
+      address={address}
+      card={card}
+      textMain={textMain}
+      textMuted={textMuted}
+      darkMode={!!darkMode}
+      toInr={toInr}
+      pendingAction={pendingAction}
+      onBack={() => setView('home')}
+      onPay={() => { setFundIdInput(String(selectedFund.id)); setContribution(fmt(selectedFund.contributionAmount)); setView('join') }}
+      onCopy={() => { void navigator.clipboard.writeText(String(selectedFund.id)); toast.success('Fund ID copied!') }}
+    />
   )
 
   return null
 }
 
-// Minimal helper — not actually used for the RPC approach above
-function encodeFunctionCall(_name: string, _args: unknown[]): string {
-  return '0x'
+// ── DetailView — shows per-member paid/unpaid status for current round ──
+interface DetailProps {
+  fund: FundInfo
+  address: string | undefined
+  card: React.CSSProperties
+  textMain: string
+  textMuted: string
+  darkMode: boolean
+  toInr: (u: string | number) => string
+  pendingAction: string
+  onBack: () => void
+  onPay: () => void
+  onCopy: () => void
+}
+
+function DetailView({ fund, address, card, textMain, textMuted, darkMode, toInr, pendingAction, onBack, onPay, onCopy }: DetailProps) {
+  const [paidStatus, setPaidStatus] = useState<Record<string, boolean>>({})
+  const [loadingStatus, setLoadingStatus] = useState(true)
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      setLoadingStatus(true)
+      try {
+        const batch = fund.members.map((m, idx) => ({
+          jsonrpc: '2.0',
+          id: idx,
+          method: 'eth_call',
+          params: [{
+            to: FUND_ADDR,
+            data: encodeFunctionData({
+              abi: CHIT_FUND_ABI,
+              functionName: 'hasPaid',
+              args: [BigInt(fund.id), fund.currentRound, m as `0x${string}`]
+            })
+          }, 'latest']
+        }))
+        const resp = await fetch('https://rpc.mainnet.arc.io', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(batch)
+        })
+        const results: { id: number; result?: string }[] = await resp.json() as { id: number; result?: string }[]
+        const map: Record<string, boolean> = {}
+        for (const r of results) {
+          const member = fund.members[r.id]
+          if (member && r.result) {
+            map[member.toLowerCase()] = r.result !== '0x' && r.result !== '0x0000000000000000000000000000000000000000000000000000000000000000'
+          }
+        }
+        setPaidStatus(map)
+      } catch { /* ignore */ }
+      setLoadingStatus(false)
+    }
+    void fetchStatus()
+  }, [fund])
+
+  const recipientIdx = Number(fund.currentRound) % fund.members.length
+  const recipient = fund.members[recipientIdx]
+  const myAddr = address?.toLowerCase() ?? ''
+  const iPaid = paidStatus[myAddr] ?? false
+  const paidCount = Object.values(paidStatus).filter(Boolean).length
+  const totalMembers = fund.members.length
+  const deadline = Number(fund.roundDeadline)
+  const deadlineStr = deadline > 0 ? new Date(deadline * 1000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : null
+
+  return (
+    <div className="pb-24 px-4 pt-4 space-y-4 max-w-md mx-auto">
+      <button onClick={onBack} className="flex items-center gap-2 text-sm font-medium" style={{ color: '#7c3aed' }}>
+        <ArrowLeft size={16} /> Back
+      </button>
+
+      {/* Header */}
+      <div style={card}>
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: textMain }}>{fund.name}</h2>
+            <p className="text-xs" style={{ color: textMuted }}>Committee ID: {fund.id}</p>
+          </div>
+          <span className="text-xs px-2 py-1 rounded-full font-bold" style={{ background: fund.active ? 'rgba(22,163,74,0.15)' : 'rgba(239,68,68,0.15)', color: fund.active ? '#16a34a' : '#ef4444' }}>
+            {fund.active ? 'Active' : 'Ended'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="rounded-xl p-2 text-center" style={{ background: darkMode ? 'rgba(124,58,237,0.15)' : 'rgba(124,58,237,0.07)' }}>
+            <p className="text-xs" style={{ color: textMuted }}>Each pays</p>
+            <p className="text-base font-bold" style={{ color: '#7c3aed' }}>${fmt(fund.contributionAmount)}</p>
+            <p className="text-xs" style={{ color: textMuted }}>{toInr(fmt(fund.contributionAmount))}</p>
+          </div>
+          <div className="rounded-xl p-2 text-center" style={{ background: darkMode ? 'rgba(22,163,74,0.15)' : 'rgba(22,163,74,0.07)' }}>
+            <p className="text-xs" style={{ color: textMuted }}>Round</p>
+            <p className="text-base font-bold" style={{ color: '#16a34a' }}>{Number(fund.currentRound) + 1}/{Number(fund.totalRounds)}</p>
+            <p className="text-xs" style={{ color: textMuted }}>{totalMembers} members</p>
+          </div>
+          <div className="rounded-xl p-2 text-center" style={{ background: darkMode ? 'rgba(234,179,8,0.15)' : 'rgba(234,179,8,0.07)' }}>
+            <p className="text-xs" style={{ color: textMuted }}>Paid</p>
+            <p className="text-base font-bold" style={{ color: '#ca8a04' }}>{loadingStatus ? '…' : `${paidCount}/${totalMembers}`}</p>
+            <p className="text-xs" style={{ color: textMuted }}>this round</p>
+          </div>
+        </div>
+
+        {deadlineStr && (
+          <p className="text-xs text-center mb-3" style={{ color: textMuted }}>Round deadline: {deadlineStr}</p>
+        )}
+      </div>
+
+      {/* My payment status */}
+      {!loadingStatus && (
+        <div className="rounded-2xl p-4 flex items-center gap-3" style={{
+          background: iPaid ? 'rgba(22,163,74,0.12)' : 'rgba(239,68,68,0.1)',
+          border: `1px solid ${iPaid ? 'rgba(22,163,74,0.3)' : 'rgba(239,68,68,0.3)'}`
+        }}>
+          <span className="text-2xl">{iPaid ? '✅' : '⏳'}</span>
+          <div className="flex-1">
+            <p className="font-bold text-sm" style={{ color: iPaid ? '#16a34a' : '#ef4444' }}>
+              {iPaid ? 'You have paid this round' : 'You have not paid yet'}
+            </p>
+            <p className="text-xs" style={{ color: textMuted }}>
+              {iPaid ? 'Waiting for others to pay' : `Pay $${fmt(fund.contributionAmount)} (${toInr(fmt(fund.contributionAmount))})`}
+            </p>
+          </div>
+          {!iPaid && (
+            <button
+              onClick={onPay}
+              disabled={!!pendingAction}
+              className="px-3 py-2 rounded-xl text-sm font-bold text-white"
+              style={{ background: 'linear-gradient(135deg,#16a34a,#15803d)' }}
+            >
+              Pay Now
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Who gets the pot */}
+      {recipient && (
+        <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg,#7c3aed,#6d28d9)' }}>
+          <p className="text-white text-xs font-medium mb-1">This round's pot goes to</p>
+          <p className="text-white font-bold text-base">{recipient.toLowerCase() === myAddr ? '🎉 YOU!' : `${recipient.slice(0, 8)}…${recipient.slice(-5)}`}</p>
+          <p className="text-purple-200 text-xs mt-1">Total pot: ${(parseFloat(fmt(fund.contributionAmount)) * totalMembers).toFixed(2)} USDC</p>
+        </div>
+      )}
+
+      {/* Members list with paid/unpaid */}
+      <div style={card}>
+        <p className="text-sm font-bold mb-3" style={{ color: textMain }}>All Members — Round {Number(fund.currentRound) + 1}</p>
+        {loadingStatus ? (
+          <div className="text-center py-3"><Loader2 size={18} className="animate-spin mx-auto" style={{ color: '#7c3aed' }} /></div>
+        ) : (
+          fund.members.map((m, i) => {
+            const paid = paidStatus[m.toLowerCase()] ?? false
+            const isMe = m.toLowerCase() === myAddr
+            const getsPool = i === recipientIdx
+            return (
+              <div key={m} className="flex items-center justify-between py-2.5 border-b" style={{ borderColor: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{paid ? '✅' : '⏳'}</span>
+                  <div>
+                    <p className="text-xs font-mono" style={{ color: isMe ? '#7c3aed' : textMain }}>
+                      {isMe ? 'You' : `${m.slice(0, 8)}…${m.slice(-5)}`}
+                    </p>
+                    <p className="text-xs" style={{ color: paid ? '#16a34a' : '#ef4444' }}>
+                      {paid ? 'Paid' : 'Not paid yet'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  {getsPool && <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(124,58,237,0.15)', color: '#7c3aed' }}>Gets pot 💰</span>}
+                  <span className="text-xs" style={{ color: textMuted }}>#{i + 1}</span>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Actions */}
+      <button
+        onClick={onCopy}
+        className="w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
+        style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(124,58,237,0.08)', color: '#7c3aed' }}
+      >
+        <Copy size={16} /> Copy Committee ID to share
+      </button>
+    </div>
+  )
 }

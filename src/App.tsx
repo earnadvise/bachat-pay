@@ -254,6 +254,9 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
   // ── Onchain history from Arc explorer ─────────────────────────────────────
   const [onchainHistory, setOnchainHistory] = useState<HistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
+  const refreshHistory = useCallback(() => setHistoryRefreshKey(k => k + 1), [])
+
   useEffect(() => {
     if (!address) return
     setHistoryLoading(true)
@@ -261,8 +264,8 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
     void (async () => {
       try {
         const res = await fetch(
-          `${ARC_EXPLORER_API}/addresses/${address}/token-transfers?token=${USDC_ADDRESS}&limit=20`,
-          { signal: ctrl.signal }
+          `${ARC_EXPLORER_API}/addresses/${address}/token-transfers?token=${USDC_ADDRESS}&limit=50&_t=${Date.now()}`,
+          { signal: ctrl.signal, cache: 'no-store' }
         )
         if (!res.ok) return
         const data = await res.json() as { items?: Array<{ transaction_hash: string; from: { hash: string }; to: { hash: string }; total: { value: string; decimals: string }; timestamp: string }> }
@@ -279,7 +282,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
       finally { if (!ctrl.signal.aborted) setHistoryLoading(false) }
     })()
     return () => ctrl.abort()
-  }, [address])
+  }, [address, historyRefreshKey])
 
   // merged history: onchain first, then local-only entries not in onchain
   const mergedHistory = [
@@ -342,6 +345,8 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
     saveEntry({ hash: payHash, to: payTo, amount: payAmount, note: payNote, ts: Date.now(), dir: 'out' })
     saveRecentContact(payTo)
     void refetchBalance()
+    // Refresh history after a short delay so explorer indexes the tx
+    setTimeout(refreshHistory, 4000)
     toast.success('Payment sent!')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transferSuccess])
