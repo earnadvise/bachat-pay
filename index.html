@@ -60,6 +60,17 @@
       <style>#splash{transition:opacity 0.3s}@keyframes splash-bar{0%{width:0%}60%{width:80%}100%{width:100%}}</style>
       <script>window.addEventListener('DOMContentLoaded',function(){var r=document.getElementById('root');if(r){var o=new MutationObserver(function(){var s=document.getElementById('splash');if(s&&r.children.length>1){s.style.opacity='0';setTimeout(function(){s.remove()},300);o.disconnect()}});o.observe(r,{childList:true})}})</script>
     </div>
+    <script>
+      // Unregister any old service workers so stale caches never serve old code
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          regs.forEach(function(reg) { reg.unregister(); });
+        });
+        caches.keys().then(function(keys) {
+          keys.forEach(function(key) { caches.delete(key); });
+        });
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
