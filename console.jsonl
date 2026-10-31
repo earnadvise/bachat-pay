@@ -241,3 +241,35 @@
 {"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793367875477}
 {"level":"debug","message":"[vite] connected.","timestamp":1793367876435}
 {"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793367888227}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793368091796}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793368092507}
+{"level":"debug","message":"[vite] connected.","timestamp":1793368092937}
+{"level":"debug","message":"[vite] connected.","timestamp":1793368094012}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793368121451}
+{"level":"error","message":"Error checking Cross-Origin-Opener-Policy: Failed to fetch","timestamp":1793368122230}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793368124697}
+{"level":"debug","message":"[vite] connected.","timestamp":1793368125530}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793368258029}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793368258548}
+{"level":"debug","message":"[vite] connected.","timestamp":1793368259162}
+{"level":"debug","message":"[vite] connected.","timestamp":1793368259730}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793368421030}
+{"level":"debug","message":"[vite] connected.","timestamp":1793368421991}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793368423932}
+{"level":"debug","message":"[vite] connected.","timestamp":1793368424894}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793373299075}
+{"level":"debug","message":"[vite] connected.","timestamp":1793373299533}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793373319818}
+{"level":"debug","message":"[vite] connected.","timestamp":1793373320684}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793424584076}
+{"level":"debug","message":"[vite] connected.","timestamp":1793424584753}
+{"level":"debug","message":"[vite] connected.","timestamp":1793424608043}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793424608352}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793430554166}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793430555098}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793430556649}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793430556649}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793430560373}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793430560373}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793430561863}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793430561863}

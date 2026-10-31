@@ -350,7 +350,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
   const [payNote, setPayNote] = useState(() => new URLSearchParams(window.location.search).get('note') ?? '')
   const [payStep, setPayStep] = useState<'idle' | 'sending' | 'done'>('idle')
   const [payHash, setPayHash] = useState<`0x${string}` | undefined>()
-  const [payInrMode, setPayInrMode] = useState(false)
+  const [payInrMode, setPayInrMode] = useState(true)
   const [payInrAmount, setPayInrAmount] = useState('')
 
   // ── Gas estimate ───────────────────────────────────────────────────────────
@@ -936,28 +936,35 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 {/* Amount with INR toggle */}
                 <div className="mb-3" style={innerStyle}>
                   <div className="rounded-xl p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold" style={{ color:textMuted }}>{payInrMode ? 'Amount (₹ INR)' : 'Amount (USDC)'}</label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-bold" style={{ color:textMain }}>{payInrMode ? '₹ Enter amount in Rupees' : '$ Enter amount in USDC'}</label>
                       <button onClick={() => { setPayInrMode(m => !m); setPayInrAmount(''); setPayAmount('') }}
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{ background:'rgba(59,130,246,0.12)', color:'#1d4ed8' }}>
-                        {payInrMode ? 'Switch to USDC' : 'Enter in ₹'}
+                        className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full"
+                        style={{ background: payInrMode ? 'rgba(59,130,246,0.15)' : 'rgba(34,197,94,0.15)', color: payInrMode ? '#1d4ed8' : '#16a34a', border: payInrMode ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(34,197,94,0.3)' }}>
+                        {payInrMode ? '$ Switch to USDC' : '₹ Switch to INR'}
                       </button>
                     </div>
                     {payInrMode ? (
                       <>
-                        <input
-                          value={payInrAmount}
-                          onChange={e => { setPayInrAmount(e.target.value); setPayAmount(inrRate > 0 ? (parseFloat(e.target.value || '0') / inrRate).toFixed(4) : '') }}
-                          placeholder="0"
-                          type="number"
-                          inputMode="decimal"
-                          className="bp-input w-full bg-transparent text-2xl font-bold outline-none tabular-nums"
-                          style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}
-                        />
-                        {payAmount && parseFloat(payAmount) > 0 && (
-                          <p className="text-xs mt-1" style={{ color:textMuted }}>${parseFloat(payAmount).toFixed(4)} USDC</p>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl font-bold" style={{ color: textMuted }}>₹</span>
+                          <input
+                            value={payInrAmount}
+                            onChange={e => { setPayInrAmount(e.target.value); setPayAmount(inrRate > 0 ? (parseFloat(e.target.value || '0') / inrRate).toFixed(4) : '') }}
+                            placeholder="25"
+                            type="number"
+                            inputMode="decimal"
+                            className="bp-input flex-1 bg-transparent text-3xl font-bold outline-none tabular-nums"
+                            style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          {payAmount && parseFloat(payAmount) > 0
+                            ? <p className="text-sm font-semibold" style={{ color:'#1d4ed8' }}>= ${parseFloat(payAmount).toFixed(4)} USDC</p>
+                            : <p className="text-xs" style={{ color:textMuted }}>Enter ₹ amount above</p>
+                          }
+                          <p className="text-xs" style={{ color:textMuted }}>1 USDC = ₹{inrRate.toFixed(0)}</p>
+                        </div>
                       </>
                     ) : (
                       <>
