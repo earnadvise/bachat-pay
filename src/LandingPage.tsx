@@ -558,7 +558,7 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) 
         fontSize: 13, color: '#9ca3af',
       }}>
         <TokenUSDC size={16} />
-        <span className="hidden sm:inline">BachatPay — Built with <a href="https://studio.arc.io" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}>Arc Studio</a> on Arc Mainnet</span>
+        <span className="hidden sm:inline">BachatPay — Powered by Arc Mainnet</span>
         <span className="sm:hidden">BachatPay — USDC on Arc Mainnet</span>
       </footer>
 
