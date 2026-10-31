@@ -301,3 +301,26 @@
 {"level":"debug","message":"[vite] hot updated: /src/LandingPage.tsx","timestamp":1793434764735}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793434764735}
 {"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793434767725}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793434933401}
+{"level":"debug","message":"[vite] connected.","timestamp":1793434934146}
+{"level":"debug","message":"[vite] connected.","timestamp":1793434948455}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793434948482}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793434983281}
+{"level":"debug","message":"[vite] connected.","timestamp":1793434983963}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793434984012}
+{"level":"debug","message":"[vite] connected.","timestamp":1793434984848}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793434998834}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793434999416}
+{"level":"debug","message":"[vite] connected.","timestamp":1793434999762}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793434999855}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793435011169}
+{"level":"debug","message":"[vite] connected.","timestamp":1793435011311}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793435077817}
+{"level":"debug","message":"[vite] connected.","timestamp":1793435078411}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793435078441}
+{"level":"debug","message":"[vite] connected.","timestamp":1793435078541}
+{"level":"warn","message":"The configured WalletConnect 'metadata.url':https://arc-studio-7630b92000bb479e8ada5b05.vercel.app differs from the actual page url:https://igo7wr9r8qg9mhw9dc8pg.preview.studio.arc.io. This is probably unintended and can lead to issues.","timestamp":1793435199100}
+{"level":"error","message":"Warning: You are calling ReactDOMClient.createRoot() on a container that has already been passed to createRoot() before. Instead, call root.render() on the existing root instead if you want to update it.","timestamp":1793435202173}
+{"level":"debug","message":"[vite] invalidate /src/main.tsx: Could not Fast Refresh (\"true\" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports","timestamp":1793435202260}
+{"level":"debug","message":"[vite] hot updated: /src/main.tsx","timestamp":1793435202260}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793435202260}
