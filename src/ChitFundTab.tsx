@@ -226,6 +226,19 @@ export default function ChitFundTab({ toInr, darkMode, resolveLabel: resolveLabe
     }
   }, [writeContractAsync])
 
+  const handleDisburse = useCallback(async (fundId: number) => {
+    if (!isConnected) return toast.error('Connect wallet first')
+    try {
+      setPendingAction('disburse')
+      const hash = await writeContractAsync({ address: FUND_ADDR, abi: CHIT_FUND_ABI, functionName: 'disburse', args: [BigInt(fundId)] })
+      setTxHash(hash)
+      toast('Releasing pot…')
+    } catch (e: unknown) {
+      setPendingAction('')
+      toast.error(e instanceof Error ? e.message : 'Transaction failed')
+    }
+  }, [isConnected, writeContractAsync])
+
   const handleClaim = useCallback(async () => {
     try {
       setPendingAction('claim')
@@ -594,6 +607,9 @@ export default function ChitFundTab({ toInr, darkMode, resolveLabel: resolveLabe
       onBack={() => setView('home')}
       onPay={() => { setFundIdInput(String(selectedFund.id)); setContribution(fmt(selectedFund.contributionAmount)); setView('join') }}
       onCopy={() => { void navigator.clipboard.writeText(String(selectedFund.id)); toast.success('Fund ID copied!') }}
+      onDisburse={() => void handleDisburse(selectedFund.id)}
+      onClaim={() => void handleClaim()}
+      claimAmt={claimAmt}
       resolveLabel={resolveLabel}
     />
   )
@@ -614,12 +630,16 @@ interface DetailProps {
   onBack: () => void
   onPay: () => void
   onCopy: () => void
+  onDisburse: () => void
+  onClaim: () => void
+  claimAmt: string
   resolveLabel: (addr: string) => string
 }
 
-function DetailView({ fund, address, card, textMain, textMuted, darkMode, toInr, pendingAction, onBack, onPay, onCopy, resolveLabel }: DetailProps) {
+function DetailView({ fund, address, card, textMain, textMuted, darkMode, toInr, pendingAction, onBack, onPay, onCopy, onDisburse, onClaim, claimAmt, resolveLabel }: DetailProps) {
   const [paidStatus, setPaidStatus] = useState<Record<string, boolean>>({})
   const [loadingStatus, setLoadingStatus] = useState(true)
+  const allPaid = !loadingStatus && fund.members.length > 0 && fund.members.every(m => paidStatus[m.toLowerCase()])
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -782,6 +802,30 @@ function DetailView({ fund, address, card, textMain, textMuted, darkMode, toInr,
           })
         )}
       </div>
+
+      {/* Disburse + Claim */}
+      {allPaid && (
+        <div className="space-y-2">
+          <button
+            onClick={onDisburse}
+            disabled={!!pendingAction}
+            className="w-full py-4 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg,#7c3aed,#6d28d9)' }}
+          >
+            {pendingAction === 'disburse' ? <><Loader2 size={20} className="animate-spin" /> Releasing pot…</> : <>💰 Release Pot to Recipient</>}
+          </button>
+          {parseFloat(claimAmt) > 0 && (
+            <button
+              onClick={onClaim}
+              disabled={!!pendingAction}
+              className="w-full py-4 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-2"
+              style={{ background: 'linear-gradient(135deg,#16a34a,#15803d)' }}
+            >
+              {pendingAction === 'claim' ? <><Loader2 size={20} className="animate-spin" /> Claiming…</> : <><Gift size={20} /> Claim ${claimAmt} USDC</>}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* WhatsApp share */}
       <button
