@@ -35,45 +35,159 @@ body {
 .display { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.03em; }
 .mono { font-family: 'JetBrains Mono', Menlo, monospace; }
 
-/* ── BachatPay global polish ────────────────────────────────────────────── */
+/* ── BachatPay premium animations ───────────────────────────────────────── */
+
+/* Glow pulse on pay button */
 @keyframes bp-glow-pulse {
-  0%,100% { box-shadow: 0 4px 24px rgba(29,78,216,0.35), 0 0 0 0 rgba(29,78,216,0.25); }
-  50%      { box-shadow: 0 8px 40px rgba(29,78,216,0.55), 0 0 0 8px rgba(29,78,216,0); }
+  0%,100% { box-shadow: 0 4px 28px rgba(29,78,216,0.45), 0 0 0 0 rgba(29,78,216,0.3); }
+  50%      { box-shadow: 0 8px 48px rgba(124,58,237,0.6), 0 0 0 10px rgba(29,78,216,0); }
 }
+
+/* Balance card entrance */
 @keyframes bp-balance-in {
-  from { opacity:0; transform: scale(0.92) translateY(6px); }
-  to   { opacity:1; transform: scale(1)    translateY(0);   }
+  from { opacity:0; transform: scale(0.94) translateY(8px); }
+  to   { opacity:1; transform: scale(1) translateY(0); }
 }
+
+/* Slide up for cards */
 @keyframes bp-slide-up {
-  from { opacity:0; transform: translateY(16px); }
-  to   { opacity:1; transform: translateY(0);    }
+  from { opacity:0; transform: translateY(20px); }
+  to   { opacity:1; transform: translateY(0); }
 }
+
+/* Success checkmark pop */
+@keyframes bp-success-pop {
+  0%   { transform: scale(0); opacity:0; }
+  60%  { transform: scale(1.2); opacity:1; }
+  100% { transform: scale(1); opacity:1; }
+}
+
+/* Shimmer on loading */
+@keyframes bp-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Floating dots on hero */
+@keyframes bp-float {
+  0%,100% { transform: translateY(0px) rotate(0deg); }
+  33%      { transform: translateY(-12px) rotate(3deg); }
+  66%      { transform: translateY(-6px) rotate(-2deg); }
+}
+
+/* Ticker scroll */
+@keyframes ticker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Gradient text shift */
+@keyframes gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Nav dot */
 @keyframes bp-tab-dot {
   0%,100% { transform: scaleX(1); }
-  50%      { transform: scaleX(1.5); }
+  50%      { transform: scaleX(1.6); }
 }
 
-/* Pay button glow */
+/* Mesh blob */
+@keyframes blob-move {
+  0%,100% { transform: translate(0,0) scale(1); }
+  33%      { transform: translate(40px,-20px) scale(1.05); }
+  66%      { transform: translate(-20px,30px) scale(0.95); }
+}
+
+/* ── Component styles ───────────────────────────────────────────────────── */
+
+/* Pay button */
 .bp-pay-btn {
-  background: linear-gradient(135deg,#1d4ed8,#7c3aed) !important;
-  animation: bp-glow-pulse 3s ease-in-out infinite;
-  transition: transform 0.15s ease, opacity 0.15s ease !important;
+  background: linear-gradient(135deg,#1d4ed8,#4f46e5,#7c3aed) !important;
+  background-size: 200% 200% !important;
+  animation: bp-glow-pulse 3s ease-in-out infinite, gradient-shift 4s ease infinite;
+  transition: transform 0.12s ease, opacity 0.12s ease !important;
+  border: none !important;
 }
-.bp-pay-btn:not(:disabled):active { transform: scale(0.97) !important; }
-.bp-pay-btn:disabled { animation: none !important; }
+.bp-pay-btn:not(:disabled):hover  { transform: translateY(-1px) scale(1.01) !important; }
+.bp-pay-btn:not(:disabled):active { transform: scale(0.96) !important; }
+.bp-pay-btn:disabled { animation: none !important; opacity: 0.6 !important; }
 
-/* Balance number entrance */
-.bp-balance { animation: bp-balance-in 0.5s ease forwards; }
+/* Balance */
+.bp-balance { animation: bp-balance-in 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards; }
 
-/* Card entrance */
-.bp-card-in { animation: bp-slide-up 0.4s ease forwards; }
+/* Card entrance (staggered via delay) */
+.bp-card-in { animation: bp-slide-up 0.45s ease forwards; }
+.bp-card-in-2 { animation: bp-slide-up 0.45s 0.1s ease both; }
+.bp-card-in-3 { animation: bp-slide-up 0.45s 0.2s ease both; }
 
-/* Active nav dot pulse */
-.bp-nav-dot { animation: bp-tab-dot 2s ease-in-out infinite; }
+/* Success pop */
+.bp-success-pop { animation: bp-success-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
 
-/* Input focus glow */
-.bp-input:focus { box-shadow: 0 0 0 3px rgba(59,130,246,0.25) !important; outline: none; }
+/* Shimmer skeleton */
+.bp-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0.1) 75%);
+  background-size: 200% auto;
+  animation: bp-shimmer 1.5s linear infinite;
+}
 
-/* Smooth all transitions */
-button { transition: opacity 0.15s ease, transform 0.15s ease; }
-button:active { opacity: 0.85; }
+/* Active nav dot */
+.bp-nav-dot { animation: bp-tab-dot 2.5s ease-in-out infinite; }
+
+/* Input focus */
+.bp-input { transition: box-shadow 0.2s ease, border-color 0.2s ease; border-radius: 12px; }
+.bp-input:focus { box-shadow: 0 0 0 3px rgba(99,102,241,0.3) !important; outline: none; border-color: rgba(99,102,241,0.6) !important; }
+
+/* Action button (send/receive/scan/bridge) */
+.bp-action-btn {
+  transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s ease;
+}
+.bp-action-btn:active { transform: scale(0.88) !important; }
+.bp-action-btn:hover  { transform: translateY(-2px) scale(1.05); }
+
+/* Feature card hover */
+.feature-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+.feature-card:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 20px 48px rgba(29,78,216,0.15) !important;
+}
+
+/* Stat card gradient text */
+.stat-val {
+  background: linear-gradient(90deg,#1d4ed8,#7c3aed,#06b6d4,#1d4ed8);
+  background-size: 300% auto;
+  animation: gradient-shift 4s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Mesh blobs */
+.bp-blob { animation: blob-move 8s ease-in-out infinite; }
+.bp-blob-2 { animation: blob-move 10s 2s ease-in-out infinite; }
+.bp-blob-3 { animation: blob-move 12s 4s ease-in-out infinite; }
+
+/* Glass morphism card */
+.bp-glass {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+/* Smooth all buttons */
+button {
+  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+button:active:not(:disabled) { opacity: 0.88; }
+
+/* Hide scrollbars but keep scroll */
+::-webkit-scrollbar { width: 0; height: 0; }
+* { scrollbar-width: none; }
+
+/* Safe area padding for notched phones */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }

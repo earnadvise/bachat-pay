@@ -148,25 +148,37 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
   const connectors = useConnectors()
   const [rabbyConnecting, setRabbyConnecting] = useState(false)
 
+  const [wcUri, setWcUri] = useState<string | null>(null)
+  const [showRabbyModal, setShowRabbyModal] = useState(false)
+
   const connectWithRabby = useCallback(async () => {
     const wc = connectors.find(c => c.id === 'walletConnect')
     if (!wc) return toast.error('WalletConnect not available')
     setRabbyConnecting(true)
     try {
-      // Get the WC URI by triggering the connector
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const provider = await (wc as any).getProvider?.()
+      // Listen for URI from WC provider
+      let uri: string | null = null
       if (provider?.signer?.uri) {
-        const uri = encodeURIComponent(provider.signer.uri)
-        window.location.href = `rabby://wc?uri=${uri}`
-        setTimeout(() => {
-          // fallback: open WC URI directly
-          window.location.href = `wc:${decodeURIComponent(uri)}`
-        }, 2000)
+        uri = provider.signer.uri as string
+      } else if (provider?.on) {
+        await new Promise<void>(resolve => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          provider.on('display_uri', (u: string) => { uri = u; resolve() })
+          connect({ connector: wc })
+          setTimeout(resolve, 3000)
+        })
+      }
+      if (uri) {
+        // Try deep link first, show fallback modal with copy button
+        const encoded = encodeURIComponent(uri)
+        const deepLink = `rabby://wc?uri=${encoded}`
+        window.location.href = deepLink
+        setWcUri(uri)
+        setShowRabbyModal(true)
       } else {
-        // fallback: just trigger normal connect and tell user to scan
         connect({ connector: wc })
-        toast('Tap "Other" → "Copy to Clipboard" → paste in Rabby Mobile')
       }
     } catch {
       connect({ connector: wc })
@@ -676,20 +688,23 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
       </div>
 
       {/* ── HEADER ── */}
-      <header className="relative z-10 flex items-center justify-between px-4 pt-safe-top pb-3 pt-4" style={cardStyle}>
-        <button
-          onClick={onGoBack}
-          className="flex items-center gap-2 rounded-xl px-2 py-1 transition-opacity hover:opacity-70 active:opacity-50"
-          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-          title="Back to home"
-        >
-          <div className="flex size-8 items-center justify-center rounded-full" style={{ background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)' }}>
+      <header className="relative z-10 flex items-center justify-between px-4 pt-4 pb-3" style={{
+        background: dk ? 'rgba(10,14,28,0.92)' : 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: dk ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.05)',
+      }}>
+        <button onClick={onGoBack} className="flex items-center gap-2.5 active:opacity-70">
+          <div className="flex size-9 items-center justify-center rounded-2xl" style={{ background:'linear-gradient(135deg,#3b82f6,#8b5cf6)', boxShadow:'0 4px 12px rgba(99,102,241,0.4)' }}>
             <TokenUSDC size={18} variant="branded" />
           </div>
-          <span className="text-base font-bold tracking-tight" style={{ fontFamily:'Space Grotesk,sans-serif', color:textMain }}>BachatPay</span>
+          <div>
+            <span className="block font-extrabold" style={{ fontFamily:'Space Grotesk,sans-serif', color:textMain, fontSize:17, letterSpacing:'-0.02em', lineHeight:1.1 }}>BachatPay</span>
+            <span className="block text-xs font-medium" style={{ color: dk ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)', lineHeight:1 }}>Arc Mainnet</span>
+          </div>
         </button>
         <div className="flex items-center gap-2">
-          <button onClick={toggleDark} className="flex size-8 items-center justify-center rounded-full text-lg transition active:scale-90" style={{ background: dk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} title="Toggle dark mode">
+          <button onClick={toggleDark} className="flex size-9 items-center justify-center rounded-2xl text-base transition active:scale-90" style={{ background: dk ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }}>
             {dk ? '☀️' : '🌙'}
           </button>
           <ConnectKitButton />
@@ -714,51 +729,59 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
             )}
 
             {/* Balance hero */}
-            <div className="rounded-3xl overflow-hidden" style={{ ...cardStyle, padding: 0 }}>
-              {/* Top gradient strip */}
-              <div style={{ background: 'linear-gradient(135deg,#1d4ed8 0%,#7c3aed 100%)', padding: '20px 20px 28px' }}>
-                <div className="flex items-center justify-between mb-3">
+            <div className="rounded-3xl overflow-hidden bp-card-in" style={{ position:'relative', boxShadow:'0 8px 40px rgba(29,78,216,0.25)' }}>
+              {/* Mesh gradient background */}
+              <div style={{ background:'linear-gradient(135deg,#0f172a 0%,#1e1b4b 40%,#312e81 70%,#1d4ed8 100%)', padding:'22px 20px 24px', position:'relative', overflow:'hidden' }}>
+                {/* Animated blobs */}
+                <div className="bp-blob" style={{ position:'absolute', top:'-30px', right:'-20px', width:'140px', height:'140px', borderRadius:'50%', background:'rgba(124,58,237,0.35)', filter:'blur(40px)' }} />
+                <div className="bp-blob-2" style={{ position:'absolute', bottom:'-20px', left:'10px', width:'100px', height:'100px', borderRadius:'50%', background:'rgba(59,130,246,0.3)', filter:'blur(30px)' }} />
+                <div className="bp-blob-3" style={{ position:'absolute', top:'10px', left:'40%', width:'80px', height:'80px', borderRadius:'50%', background:'rgba(16,185,129,0.2)', filter:'blur(25px)' }} />
+                {/* Header row */}
+                <div className="flex items-center justify-between mb-4" style={{ position:'relative' }}>
                   <div className="flex items-center gap-2">
-                    <TokenUSDC size={20} variant="branded" />
-                    <span className="text-xs font-bold tracking-widest uppercase" style={{ color:'rgba(255,255,255,0.7)' }}>USDC Balance</span>
+                    <div style={{ background:'rgba(255,255,255,0.15)', borderRadius:'8px', padding:'4px' }}>
+                      <TokenUSDC size={16} variant="branded" />
+                    </div>
+                    <span className="text-xs font-bold tracking-widest uppercase" style={{ color:'rgba(255,255,255,0.65)', letterSpacing:'0.12em' }}>USDC Balance</span>
                   </div>
                   {isConnected && onArc && (
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background:'rgba(255,255,255,0.15)', color:'white' }}>Arc Mainnet</span>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background:'rgba(255,255,255,0.12)', border:'1px solid rgba(255,255,255,0.2)' }}>
+                      <div style={{ width:6, height:6, borderRadius:'50%', background:'#4ade80', boxShadow:'0 0 6px #4ade80' }} />
+                      <span className="text-xs font-semibold" style={{ color:'rgba(255,255,255,0.9)' }}>Arc Live</span>
+                    </div>
                   )}
                 </div>
-                <div className="flex items-end gap-2">
-                  <span className="bp-balance text-5xl font-bold tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:'white', letterSpacing:'-0.03em' }}>
-                    {!isConnected ? '—' : !onArc ? '—' : `$${balanceDisplay}`}
+                {/* Big balance */}
+                <div style={{ position:'relative' }}>
+                  <span className="bp-balance tabular-nums" style={{ fontFamily:'Space Grotesk,sans-serif', color:'white', letterSpacing:'-0.04em', fontSize:'clamp(2.4rem,10vw,3.2rem)', fontWeight:800, lineHeight:1.05, display:'block' }}>
+                    {!isConnected ? '——' : !onArc ? '——' : `$${balanceDisplay}`}
                   </span>
+                  {isConnected && onArc && usdcBalance != null && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-lg font-semibold tabular-nums" style={{ color:'rgba(255,255,255,0.8)' }}>{toInr(balanceDisplay)}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background:'rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.55)' }}>
+                        1 USDC = ₹{inrRate.toFixed(2)}{rateAge ? ` · ${rateAge}` : ''}
+                      </span>
+                    </div>
+                  )}
+                  {!isConnected && (
+                    <p className="text-sm mt-2 font-medium" style={{ color:'rgba(255,255,255,0.5)' }}>Connect wallet to see balance</p>
+                  )}
                 </div>
-                {isConnected && onArc && usdcBalance != null && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-base font-semibold tabular-nums" style={{ color:'rgba(255,255,255,0.85)' }}>
-                      {toInr(balanceDisplay)}
-                    </span>
-                    <span className="text-xs" style={{ color:'rgba(255,255,255,0.5)' }}>
-                      1 USDC = ₹{inrRate.toFixed(2)}{rateAge ? ` · ${rateAge}` : ''}
-                    </span>
-                  </div>
-                )}
-                {!isConnected && (
-                  <p className="text-sm mt-1" style={{ color:'rgba(255,255,255,0.6)' }}>Connect wallet to see balance</p>
-                )}
               </div>
-              {/* Action row */}
-              <div className="grid grid-cols-4 gap-0 p-3" style={{ background: dk ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.6)' }}>
+              {/* Action row — glassmorphism */}
+              <div className="grid grid-cols-4 gap-0" style={{ background: dk ? 'rgba(15,23,42,0.95)' : 'rgba(255,255,255,0.97)', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
                 {[
-                  { icon: <Send size={18} />, label: 'Send', action: () => setTab('pay'), color: '#3b82f6', bg: 'rgba(59,130,246,0.12)' },
-                  { icon: <QrCode size={18} />, label: 'Receive', action: () => setTab('receive'), color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
-                  { icon: <ScanLine size={18} />, label: 'Scan', action: () => void startScan(), color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
-                  { icon: <Zap size={18} />, label: 'Bridge', action: () => setShowBridge(true), color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-                ].map(({ icon, label, action, color, bg }) => (
-                  <button key={label} onClick={action}
-                    className="flex flex-col items-center gap-1.5 rounded-2xl py-3 transition active:scale-95">
-                    <div className="flex size-10 items-center justify-center rounded-full" style={{ background: bg, color }}>
+                  { icon: <Send size={20} />, label: 'Send', action: () => setTab('pay'), gradient:'linear-gradient(135deg,#3b82f6,#1d4ed8)' },
+                  { icon: <QrCode size={20} />, label: 'Receive', action: () => setTab('receive'), gradient:'linear-gradient(135deg,#8b5cf6,#6d28d9)' },
+                  { icon: <ScanLine size={20} />, label: 'Scan', action: () => void startScan(), gradient:'linear-gradient(135deg,#10b981,#059669)' },
+                  { icon: <Zap size={20} />, label: 'Bridge', action: () => setShowBridge(true), gradient:'linear-gradient(135deg,#f59e0b,#d97706)' },
+                ].map(({ icon, label, action, gradient }) => (
+                  <button key={label} onClick={action} className="bp-action-btn flex flex-col items-center gap-2 py-4">
+                    <div className="flex size-11 items-center justify-center rounded-2xl text-white shadow-sm" style={{ background: gradient, boxShadow:`0 4px 12px rgba(0,0,0,0.15)` }}>
                       {icon}
                     </div>
-                    <span className="text-xs font-semibold" style={{ color:textMain }}>{label}</span>
+                    <span className="text-xs font-bold" style={{ color:textMain }}>{label}</span>
                   </button>
                 ))}
               </div>
@@ -1428,25 +1451,42 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
       </main>
 
       {/* ── BOTTOM NAV ── */}
-      <nav className="fixed bottom-0 inset-x-0 z-20 pb-safe-bottom" style={{ ...cardStyle, borderTop: dk ? '1px solid rgba(255,255,255,0.08)' : undefined }}>
+      <nav className="fixed bottom-0 inset-x-0 z-20" style={{
+        background: dk ? 'rgba(10,14,28,0.96)' : 'rgba(255,255,255,0.96)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        borderTop: dk ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(0,0,0,0.06)',
+        boxShadow: '0 -4px 24px rgba(0,0,0,0.08)',
+        paddingBottom: 'env(safe-area-inset-bottom, 8px)',
+      }}>
         <div className="mx-auto max-w-md flex">
           {([
-            { id: 'home', icon: <Wallet size={18} />, label: 'Home' },
-            { id: 'pay', icon: <Send size={18} />, label: 'Pay' },
-            { id: 'receive', icon: <QrCode size={18} />, label: 'Receive' },
-            { id: 'vault', icon: <PiggyBankIcon size={18} />, label: 'Vault' },
-            { id: 'chit', icon: <Users size={18} />, label: 'Chit' },
-            { id: 'history', icon: <History size={18} />, label: 'History' },
-            { id: 'contacts', icon: <BookUser size={18} />, label: 'Contacts' },
-          ] as { id: Tab; icon: React.ReactNode; label: string }[]).map(({ id, icon, label }) => (
-            <button key={id} onClick={() => setTab(id)}
-              className="flex flex-1 flex-col items-center gap-0.5 py-3 transition"
-              style={{ color: tab === id ? '#3b82f6' : (dk ? '#4a6080' : '#9ca3af'), minHeight: 60 }}>
-              {icon}
-              <span className="text-xs font-semibold">{label}</span>
-              {tab === id && <div className="bp-nav-dot h-0.5 w-6 rounded-full mt-0.5" style={{ background:'linear-gradient(90deg,#3b82f6,#8b5cf6)' }} />}
-            </button>
-          ))}
+            { id: 'home', icon: <Wallet size={19} />, label: 'Home' },
+            { id: 'pay', icon: <Send size={19} />, label: 'Pay' },
+            { id: 'receive', icon: <QrCode size={19} />, label: 'Receive' },
+            { id: 'vault', icon: <PiggyBankIcon size={19} />, label: 'Vault' },
+            { id: 'chit', icon: <Users size={19} />, label: 'Chit' },
+            { id: 'history', icon: <History size={19} />, label: 'History' },
+            { id: 'contacts', icon: <BookUser size={19} />, label: 'Contacts' },
+          ] as { id: Tab; icon: React.ReactNode; label: string }[]).map(({ id, icon, label }) => {
+            const active = tab === id
+            return (
+              <button key={id} onClick={() => setTab(id)}
+                className="flex flex-1 flex-col items-center gap-0.5 pt-2.5 pb-1 transition-all relative"
+                style={{ color: active ? '#6366f1' : (dk ? '#3d5070' : '#94a3b8') }}>
+                {/* Active pill background */}
+                {active && (
+                  <div style={{
+                    position:'absolute', top:6, left:'50%', transform:'translateX(-50%)',
+                    width:40, height:32, borderRadius:10,
+                    background: dk ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.1)',
+                  }} />
+                )}
+                <span style={{ position:'relative' }}>{icon}</span>
+                <span className="text-xs font-semibold" style={{ fontSize:10, position:'relative' }}>{label}</span>
+              </button>
+            )
+          })}
         </div>
       </nav>
 
