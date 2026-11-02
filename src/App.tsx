@@ -838,7 +838,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 <p className="font-bold mb-1" style={{ color:textMain }}>Connect your wallet</p>
                 <p className="text-sm mb-3" style={{ color:textMuted }}>Tap "Connect Wallet" above. Works with:</p>
                 <div className="flex flex-wrap justify-center gap-2 mb-3">
-                  {['🦊 MetaMask','🐰 Rabby','🛡️ Trust','🌈 Rainbow','🔵 Coinbase','⭕ OKX','👻 Phantom'].map(w => (
+                  {['🦊 MetaMask','🛡️ Trust','🌈 Rainbow','🔵 Coinbase','⭕ OKX','👻 Phantom','🐰 Rabby (desktop)'].map(w => (
                     <span key={w} className="text-xs font-semibold px-2 py-1 rounded-full" style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', color:textMain }}>{w}</span>
                   ))}
                 </div>
