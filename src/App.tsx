@@ -6,7 +6,7 @@
 import LandingPage from './LandingPage'
 import { CONTRACTS } from './contracts'
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { ConnectKitButton } from 'connectkit'
+import { ConnectKitButton, useModal } from 'connectkit'
 import {
   useAccount, useChainId, useSwitchChain,
   useReadContract, useWriteContract, useWaitForTransactionReceipt,
@@ -144,6 +144,7 @@ export default function App() {
 // ── Main app ───────────────────────────────────────────────────────────────────
 function AppMain({ onGoBack }: { onGoBack: () => void }) {
   const { address, isConnected } = useAccount()
+  const { setOpen: openWalletModal } = useModal()
   const { connect } = useConnect()
   const connectors = useConnectors()
   const [rabbyConnecting, setRabbyConnecting] = useState(false)
@@ -152,40 +153,36 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
   const [showRabbyModal, setShowRabbyModal] = useState(false)
 
   const connectWithRabby = useCallback(async () => {
-    const wc = connectors.find(c => c.id === 'walletConnect')
-    if (!wc) return toast.error('WalletConnect not available')
     setRabbyConnecting(true)
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const provider = await (wc as any).getProvider?.()
-      // Listen for URI from WC provider
-      let uri: string | null = null
-      if (provider?.signer?.uri) {
-        uri = provider.signer.uri as string
-      } else if (provider?.on) {
-        await new Promise<void>(resolve => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          provider.on('display_uri', (u: string) => { uri = u; resolve() })
-          connect({ connector: wc })
-          setTimeout(resolve, 3000)
-        })
+      const wc = connectors.find(c => c.id === 'walletConnect')
+      if (wc) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const provider = await (wc as any).getProvider?.()
+        let uri: string | null = null
+        if (provider?.signer?.uri) {
+          uri = provider.signer.uri as string
+        } else if (provider?.on) {
+          await new Promise<void>(resolve => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            provider.on('display_uri', (u: string) => { uri = u; resolve() })
+            connect({ connector: wc })
+            setTimeout(resolve, 1200)
+          })
+        }
+        if (uri) {
+          const encoded = encodeURIComponent(uri)
+          // Universal link works across both standalone PWA and mobile browsers
+          window.location.href = `https://rabby.io/wc?uri=${encoded}`
+        }
       }
-      if (uri) {
-        // Try deep link first, show fallback modal with copy button
-        const encoded = encodeURIComponent(uri)
-        const deepLink = `rabby://wc?uri=${encoded}`
-        window.location.href = deepLink
-        setWcUri(uri)
-        setShowRabbyModal(true)
-      } else {
-        connect({ connector: wc })
-      }
+      openWalletModal(true)
     } catch {
-      connect({ connector: wc })
+      openWalletModal(true)
     } finally {
       setRabbyConnecting(false)
     }
-  }, [connectors, connect])
+  }, [connectors, connect, openWalletModal])
   const chainId = useChainId()
   const { switchChainAsync } = useSwitchChain()
   const { data: connectorClient } = useConnectorClient()
