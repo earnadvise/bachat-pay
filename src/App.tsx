@@ -893,14 +893,13 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                   ))}
                 </div>
                 <button
-                  onClick={() => void connectWithRabby()}
-                  disabled={rabbyConnecting}
-                  className="w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 mb-2"
-                  style={{ background: 'linear-gradient(135deg,#8B5CF6,#7C3AED)', color: 'white' }}
+                  onClick={() => openWalletModal(true)}
+                  className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 mb-2 shadow-lg"
+                  style={{ background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: 'white' }}
                 >
-                  {rabbyConnecting ? <Loader2 size={16} className="animate-spin" /> : '🐰'} Connect with Rabby Mobile
+                  <Zap size={16} /> Connect Wallet (WalletConnect)
                 </button>
-                <p className="text-xs text-center" style={{ color:textMuted }}>On mobile: use WalletConnect or tap Rabby above</p>
+                <p className="text-xs text-center" style={{ color:textMuted }}>Supports MetaMask, Trust, Rainbow, Coinbase, Rabby & 400+ wallets</p>
               </div>
             )}
           </>
