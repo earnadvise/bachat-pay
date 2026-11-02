@@ -10,7 +10,7 @@ import { ConnectKitButton } from 'connectkit'
 import {
   useAccount, useChainId, useSwitchChain,
   useReadContract, useWriteContract, useWaitForTransactionReceipt,
-  useConnectorClient,
+  useConnectorClient, useConnect, useConnectors,
 } from 'wagmi'
 import { erc20Abi, parseUnits, formatUnits, isAddress } from 'viem'
 import { arc } from 'viem/chains'
@@ -144,6 +144,36 @@ export default function App() {
 // ── Main app ───────────────────────────────────────────────────────────────────
 function AppMain({ onGoBack }: { onGoBack: () => void }) {
   const { address, isConnected } = useAccount()
+  const { connect } = useConnect()
+  const connectors = useConnectors()
+  const [rabbyConnecting, setRabbyConnecting] = useState(false)
+
+  const connectWithRabby = useCallback(async () => {
+    const wc = connectors.find(c => c.id === 'walletConnect')
+    if (!wc) return toast.error('WalletConnect not available')
+    setRabbyConnecting(true)
+    try {
+      // Get the WC URI by triggering the connector
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const provider = await (wc as any).getProvider?.()
+      if (provider?.signer?.uri) {
+        const uri = encodeURIComponent(provider.signer.uri)
+        window.location.href = `rabby://wc?uri=${uri}`
+        setTimeout(() => {
+          // fallback: open WC URI directly
+          window.location.href = `wc:${decodeURIComponent(uri)}`
+        }, 2000)
+      } else {
+        // fallback: just trigger normal connect and tell user to scan
+        connect({ connector: wc })
+        toast('Tap "Other" → "Copy to Clipboard" → paste in Rabby Mobile')
+      }
+    } catch {
+      connect({ connector: wc })
+    } finally {
+      setRabbyConnecting(false)
+    }
+  }, [connectors, connect])
   const chainId = useChainId()
   const { switchChainAsync } = useSwitchChain()
   const { data: connectorClient } = useConnectorClient()
@@ -838,11 +868,19 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 <p className="font-bold mb-1" style={{ color:textMain }}>Connect your wallet</p>
                 <p className="text-sm mb-3" style={{ color:textMuted }}>Tap "Connect Wallet" above. Works with:</p>
                 <div className="flex flex-wrap justify-center gap-2 mb-3">
-                  {['🦊 MetaMask','🛡️ Trust','🌈 Rainbow','🔵 Coinbase','⭕ OKX','👻 Phantom','🐰 Rabby (desktop)'].map(w => (
+                  {['🦊 MetaMask','🛡️ Trust','🌈 Rainbow','🔵 Coinbase','⭕ OKX','👻 Phantom'].map(w => (
                     <span key={w} className="text-xs font-semibold px-2 py-1 rounded-full" style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', color:textMain }}>{w}</span>
                   ))}
                 </div>
-                <p className="text-xs" style={{ color:textMuted }}>On mobile: use WalletConnect to connect your wallet app</p>
+                <button
+                  onClick={() => void connectWithRabby()}
+                  disabled={rabbyConnecting}
+                  className="w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 mb-2"
+                  style={{ background: 'linear-gradient(135deg,#8B5CF6,#7C3AED)', color: 'white' }}
+                >
+                  {rabbyConnecting ? <Loader2 size={16} className="animate-spin" /> : '🐰'} Connect with Rabby Mobile
+                </button>
+                <p className="text-xs text-center" style={{ color:textMuted }}>On mobile: use WalletConnect or tap Rabby above</p>
               </div>
             )}
           </>
