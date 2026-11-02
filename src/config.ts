@@ -25,13 +25,13 @@ export const config = createConfig({
       metadata: {
         name: 'BachatPay',
         description: 'USDC payments on Arc — like GPay but onchain',
-        url: 'https://arc-studio-7630b92000bb479e8ada5b05.vercel.app',
-        icons: ['https://arc-studio-7630b92000bb479e8ada5b05.vercel.app/icons/icon.svg'],
+        url: 'https://bachatpay.xyz',
+        icons: ['https://bachatpay.xyz/icons/icon.svg'],
       },
     }),
     coinbaseWallet({
       appName: 'BachatPay',
-      appLogoUrl: 'https://arc-studio-7630b92000bb479e8ada5b05.vercel.app/icons/icon.svg',
+      appLogoUrl: 'https://bachatpay.xyz/icons/icon.svg',
     }),
     safe(),
   ],

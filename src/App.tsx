@@ -834,9 +834,15 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
             {!isConnected && (
               <div className="rounded-2xl p-5 text-center" style={cardStyle}>
-                <Wallet size={32} className="mx-auto mb-2" style={{ color:'#3b82f6' }} />
-                <p className="font-semibold mb-1" style={{ color:textMain }}>Connect your wallet</p>
-                <p className="text-sm" style={{ color:textMuted }}>Tap "Connect Wallet" in the top-right corner to get started</p>
+                <Wallet size={32} className="mx-auto mb-3" style={{ color:'#3b82f6' }} />
+                <p className="font-bold mb-1" style={{ color:textMain }}>Connect your wallet</p>
+                <p className="text-sm mb-3" style={{ color:textMuted }}>Tap "Connect Wallet" above. Works with:</p>
+                <div className="flex flex-wrap justify-center gap-2 mb-3">
+                  {['🦊 MetaMask','🛡️ Trust','🌈 Rainbow','🔵 Coinbase','⭕ OKX','👻 Phantom'].map(w => (
+                    <span key={w} className="text-xs font-semibold px-2 py-1 rounded-full" style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', color:textMain }}>{w}</span>
+                  ))}
+                </div>
+                <p className="text-xs" style={{ color:textMuted }}>On mobile: use WalletConnect to connect your wallet app</p>
               </div>
             )}
           </>
@@ -1487,9 +1493,38 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                   <TokenUSDC size={32} />
                 </div>
                 <h3 className="text-xl font-bold text-center mb-2" style={{ color:textMain, fontFamily:'Space Grotesk,sans-serif' }}>Connect your wallet</h3>
-                <p className="text-sm text-center mb-3 leading-relaxed" style={{ color:textMuted }}>Tap <strong style={{color:textMain}}>Connect Wallet</strong> in the top-right corner. Use MetaMask, Coinbase Wallet, or WalletConnect. Make sure you're on <strong style={{color:'#3b82f6'}}>Arc mainnet</strong> — gas fees are paid in USDC.</p>
-                <div className="rounded-xl p-3 mb-6 text-center" style={{ background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)' }}>
-                  <p className="text-xs font-semibold" style={{ color:'#1d4ed8' }}>Need USDC on Arc? Bridge from Base, Arbitrum, or Ethereum using the Bridge button on the home screen.</p>
+                <p className="text-sm text-center mb-3 leading-relaxed" style={{ color:textMuted }}>Tap <strong style={{color:textMain}}>Connect Wallet</strong> above. These wallets work with Arc mainnet:</p>
+                {/* Supported wallets grid */}
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {[
+                    { name: 'MetaMask', emoji: '🦊' },
+                    { name: 'Trust Wallet', emoji: '🛡️' },
+                    { name: 'Rainbow', emoji: '🌈' },
+                    { name: 'Coinbase', emoji: '🔵' },
+                    { name: 'OKX Wallet', emoji: '⭕' },
+                    { name: 'Phantom', emoji: '👻' },
+                  ].map(w => (
+                    <div key={w.name} className="rounded-xl p-2 text-center" style={{ background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', border:'1px solid rgba(124,58,237,0.15)' }}>
+                      <div className="text-xl mb-0.5">{w.emoji}</div>
+                      <p className="text-xs font-semibold" style={{ color:textMain }}>{w.name}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Add Arc network button */}
+                <button
+                  onClick={() => {
+                    void (window as Window & { ethereum?: { request: (args: {method: string; params: unknown[]}) => Promise<unknown> } }).ethereum?.request({
+                      method: 'wallet_addEthereumChain',
+                      params: [{ chainId: '0x13b2', chainName: 'Arc', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: ['https://rpc.mainnet.arc.io'], blockExplorerUrls: ['https://explorer.arc.io'] }]
+                    })
+                  }}
+                  className="w-full rounded-xl py-2.5 text-sm font-bold mb-3 flex items-center justify-center gap-2"
+                  style={{ background:'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.25)', color:'#1d4ed8' }}
+                >
+                  ➕ Add Arc Network to Wallet
+                </button>
+                <div className="rounded-xl p-3 mb-3 text-center" style={{ background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)' }}>
+                  <p className="text-xs font-semibold" style={{ color:'#1d4ed8' }}>Need USDC on Arc? Bridge from Base, Arbitrum, or Ethereum using the Bridge tab.</p>
                 </div>
                 <button onClick={() => setOnboardStep(3)} className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white" style={{ background:'linear-gradient(135deg,#0891b2,#0e7490)' }}>
                   Next <ChevronRight size={18} />

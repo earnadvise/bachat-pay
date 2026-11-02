@@ -1,5 +1,4 @@
 import './tracing'
-import './console-capture'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
