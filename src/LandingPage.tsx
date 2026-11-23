@@ -126,11 +126,12 @@ function TickerStrip() {
 // ── Main landing page ──────────────────────────────────────────────────────────
 export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) {
   const [copied, setCopied] = useState<string | null>(null)
-  const [installPrompt, setInstallPrompt] = useState<Event | null>(null)
+  type InstallPromptEvent = Event & { prompt: () => Promise<void> }
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   const [installed, setInstalled] = useState(false)
 
   useEffect(() => {
-    const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e) }
+    const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e as InstallPromptEvent) }
     window.addEventListener('beforeinstallprompt', handler)
     window.addEventListener('appinstalled', () => setInstalled(true))
     return () => window.removeEventListener('beforeinstallprompt', handler)
@@ -138,8 +139,7 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void }) 
 
   const handleInstall = () => {
     if (!installPrompt) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    void (installPrompt as any).prompt()
+    void installPrompt.prompt()
     setInstallPrompt(null)
   }
 

@@ -140,44 +140,48 @@ export default function ChitFundTab({ toInr, darkMode, resolveLabel: resolveLabe
     if (pendingAction === 'approve' && pendingContributeRef.current) {
       const { fundId } = pendingContributeRef.current
       pendingContributeRef.current = null
-      queueMicrotask(async () => {
-        try {
-          setPendingAction('contribute')
-          setTxHash(undefined)
-          confirmedRef.current = false
-          const h = await writeContractAsync({
-            address: FUND_ADDR,
-            abi: CHIT_FUND_ABI,
-            functionName: 'contribute',
-            args: [BigInt(fundId)],
-            chainId: ARC_CHAIN_ID,
-          })
-          setTxHash(h)
-          toast('Step 2/2: Contributing to fund…')
-        } catch (e) {
-          toast.error((e as Error).message?.slice(0, 80) ?? 'Failed')
-          setPendingAction('')
-        }
+      queueMicrotask(() => {
+        void (async () => {
+          try {
+            setPendingAction('contribute')
+            setTxHash(undefined)
+            confirmedRef.current = false
+            const h = await writeContractAsync({
+              address: FUND_ADDR,
+              abi: CHIT_FUND_ABI,
+              functionName: 'contribute',
+              args: [BigInt(fundId)],
+              chainId: ARC_CHAIN_ID,
+            })
+            setTxHash(h)
+            toast('Step 2/2: Contributing to fund…')
+          } catch (e) {
+            toast.error((e as Error).message?.slice(0, 80) ?? 'Failed')
+            setPendingAction('')
+          }
+        })()
       })
       return
     }
 
     const wasCreate = pendingAction === 'create'
     toast.success('Done! Transaction confirmed.')
-    queueMicrotask(async () => {
-      setPendingAction('')
-      setTxHash(undefined)
-      setView('home')
-      setFundName(''); setContribution(''); setMembers(''); setFundIdInput('')
-      const result = await refetchTotal()
-      if (wasCreate && result.data !== undefined) {
-        // new fund ID = totalFunds - 1 (0-indexed)
-        setNewFundId(Number(result.data) - 1)
-        setNewFundName(fundName)
-      }
-      confirmedRef.current = false
-      void refetchTotal()
-      void refetchClaim()
+    queueMicrotask(() => {
+      void (async () => {
+        setPendingAction('')
+        setTxHash(undefined)
+        setView('home')
+        setFundName(''); setContribution(''); setMembers(''); setFundIdInput('')
+        const result = await refetchTotal()
+        if (wasCreate && result.data !== undefined) {
+          // new fund ID = totalFunds - 1 (0-indexed)
+          setNewFundId(Number(result.data) - 1)
+          setNewFundName(fundName)
+        }
+        confirmedRef.current = false
+        void refetchTotal()
+        void refetchClaim()
+      })()
     })
   }, [txConfirmed, txHash, pendingAction, writeContractAsync, refetchTotal, refetchClaim])
 

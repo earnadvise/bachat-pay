@@ -19,7 +19,7 @@ import {
   Send, QrCode, History, ArrowDownLeft, Star, StarOff,
   Copy, Share2, ExternalLink, Loader2, CheckCircle2, ScanLine,
   Users, ChevronRight, Zap, X, Wallet, PiggyBank as PiggyBankIcon,
-  BookUser, Trash2, TrendingUp, TrendingDown, ArrowUpRight,
+  BookUser, Trash2, TrendingUp, TrendingDown, ArrowUpRight, Info,
 } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { QRCodeSVG } from 'qrcode.react'
@@ -104,7 +104,13 @@ function withAddChainFallback(provider: EIP1193Provider, chains: Chain[]): EIP11
       return send(args)
     }
   }) as EIP1193Provider['request']
-  return new Proxy(provider, { get(t, p) { return p === 'request' ? request : typeof Reflect.get(t, p, t) === 'function' ? (Reflect.get(t, p, t) as CallableFunction).bind(t) : Reflect.get(t, p, t) } })
+  return new Proxy(provider, {
+    get(t, p): unknown {
+      if (p === 'request') return request
+      const value: unknown = Reflect.get(t, p, t)
+      return typeof value === 'function' ? (value).bind(t) : value
+    },
+  })
 }
 
 // ── Local storage helpers ──────────────────────────────────────────────────────
@@ -132,12 +138,124 @@ function fmtDate(ts: number) {
   return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+// ── Per-tab "how it works" intro ───────────────────────────────────────────────
+const TAB_INTROS: Record<string, { title: string; points: string[]; note?: string }> = {
+  pay: {
+    title: 'Send USDC in seconds',
+    points: [
+      'Enter a wallet address, or scan the QR code of a shop or friend.',
+      'Type the amount in rupees or in USDC. The other one is shown live.',
+      'The small network fee is paid in USDC and shown before you send.',
+    ],
+  },
+  receive: {
+    title: 'Get paid with your own QR',
+    points: [
+      'Add your shop or personal name, and an amount if you want one.',
+      'Show the QR on your phone, share the link, or print it for your counter.',
+      'Customers scan it and pay you in USDC straight to your wallet.',
+    ],
+  },
+  vault: {
+    title: 'Save toward a goal',
+    points: [
+      'Create a vault with a goal name, a target amount and an unlock date.',
+      'Deposit USDC whenever you can.',
+      'Reach both the target and the date and you withdraw everything with no fee.',
+      'Withdraw earlier and a 2% fee applies. The Vault does not pay interest.',
+    ],
+  },
+  chit: {
+    title: 'Save together in a committee',
+    points: [
+      'Start a committee with 2 to 20 members and an amount to pay each round.',
+      'Every round, each member pays in. When all have paid, the pot goes to that round\'s member, in the order members were added.',
+      'Everyone receives the pot once. Tap Claim to move your pot to your wallet.',
+    ],
+    note: 'Only add people you trust. A member who has already received the pot can stop paying, and there is no collateral.',
+  },
+  history: {
+    title: 'Your activity',
+    points: [
+      'Payments, vault deposits and committee payments are read live from Arc.',
+      'Tap any row to open the transaction on the explorer.',
+    ],
+  },
+  contacts: {
+    title: 'Name your wallets',
+    points: [
+      'Save a name for a wallet address so you see names instead of 0x codes.',
+      'Contacts are stored on this device only. Clearing browser data removes them.',
+    ],
+  },
+}
+
+function TabIntro({ id, dk, cardStyle, textMain, textMuted }: {
+  id: string; dk: boolean; cardStyle: React.CSSProperties; textMain: string; textMuted: string
+}) {
+  const intro = TAB_INTROS[id]
+  const key = `bachat_intro_${id}`
+  const read = () => { try { return localStorage.getItem(key) !== '1' } catch { return true } }
+  const [open, setOpen] = useState(read)
+  if (!intro) return null
+  const close = () => { try { localStorage.setItem(key, '1') } catch { /* ignore */ } setOpen(false) }
+  const reopen = () => { try { localStorage.removeItem(key) } catch { /* ignore */ } setOpen(true) }
+
+  if (!open) {
+    return (
+      <button onClick={reopen} className="flex items-center gap-1 text-xs font-semibold" style={{ color: textMuted }}>
+        <Info size={13} /> How it works
+      </button>
+    )
+  }
+  return (
+    <div className="rounded-2xl p-4 bp-card-in" style={{ ...cardStyle, border: '1px solid rgba(99,102,241,0.25)' }}>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2">
+          <div className="flex size-7 items-center justify-center rounded-full" style={{ background: dk ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
+            <Info size={14} />
+          </div>
+          <p className="text-sm font-bold" style={{ color: textMain, fontFamily: 'Space Grotesk,sans-serif' }}>{intro.title}</p>
+        </div>
+        <button onClick={close} aria-label="Dismiss" className="flex size-6 items-center justify-center rounded-full" style={{ color: textMuted }}>
+          <X size={14} />
+        </button>
+      </div>
+      <ul className="space-y-1.5 pl-1">
+        {intro.points.map((p, i) => (
+          <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: textMuted }}>
+            <span style={{ color: '#6366f1', fontWeight: 700 }}>{i + 1}.</span>
+            <span>{p}</span>
+          </li>
+        ))}
+      </ul>
+      {intro.note && (
+        <p className="mt-2.5 rounded-xl px-3 py-2 text-xs font-medium" style={{ background: 'rgba(245,158,11,0.12)', color: dk ? '#fbbf24' : '#92400e' }}>
+          {intro.note}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ── Root component — routes between landing and app ───────────────────────────
 export default function App() {
-  const [showLanding, setShowLanding] = useState(() =>
-    !new URLSearchParams(window.location.search).get('to')
-  )
-  if (showLanding) return <LandingPage onEnterApp={() => setShowLanding(false)} />
+  const [showLanding, setShowLanding] = useState(() => {
+    // Payment links go straight to the pay screen
+    if (new URLSearchParams(window.location.search).get('to')) return false
+    // Installed phone app opens straight to the dashboard
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true
+    if (standalone) return false
+    // Returning visitors skip the landing page
+    try { return localStorage.getItem('bachat_entered') !== '1' } catch { return true }
+  })
+  const enterApp = () => {
+    try { localStorage.setItem('bachat_entered', '1') } catch { /* ignore */ }
+    setShowLanding(false)
+  }
+  if (showLanding) return <LandingPage onEnterApp={enterApp} />
   return <AppMain onGoBack={() => setShowLanding(true)} />
 }
 
@@ -149,23 +267,19 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
   const connectors = useConnectors()
   const [rabbyConnecting, setRabbyConnecting] = useState(false)
 
-  const [wcUri, setWcUri] = useState<string | null>(null)
-  const [showRabbyModal, setShowRabbyModal] = useState(false)
-
   const connectWithRabby = useCallback(async () => {
     setRabbyConnecting(true)
     try {
       const wc = connectors.find(c => c.id === 'walletConnect')
       if (wc) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const provider = await (wc as any).getProvider?.()
+        type WcProvider = { signer?: { uri?: string }; on?: (ev: string, cb: (u: string) => void) => void }
+        const provider = await (wc as unknown as { getProvider?: () => Promise<WcProvider> }).getProvider?.()
         let uri: string | null = null
         if (provider?.signer?.uri) {
-          uri = provider.signer.uri as string
+          uri = provider.signer.uri
         } else if (provider?.on) {
           await new Promise<void>(resolve => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            provider.on('display_uri', (u: string) => { uri = u; resolve() })
+            provider.on?.('display_uri', (u: string) => { uri = u; resolve() })
             connect({ connector: wc })
             setTimeout(resolve, 1200)
           })
@@ -271,7 +385,6 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
   // ── Contacts book ─────────────────────────────────────────────────────────
   const [contacts, setContacts] = useState<Contact[]>(loadContacts)
-  const [showContacts, setShowContacts] = useState(false)
   const [newContactAddr, setNewContactAddr] = useState('')
   const [newContactName, setNewContactName] = useState('')
   const [newContactEmoji, setNewContactEmoji] = useState('')
@@ -447,7 +560,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
       toast.error((e as Error).message?.slice(0, 80) ?? 'Payment failed')
       setPayStep('idle')
     }
-  }, [address, payTo, payAmount, payNote, chainId, switchChainAsync, transferUsdc])
+  }, [address, payTo, payAmount, chainId, switchChainAsync, transferUsdc])
 
   const resetPay = () => { setPayStep('idle'); setPayTo(''); setPayAmount(''); setPayNote(''); setPayHash(undefined); setPayInrAmount('') }
 
@@ -710,6 +823,9 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
 
       {/* ── CONTENT ── */}
       <main className="relative z-10 mx-auto max-w-md px-4 pb-28 pt-4 space-y-4">
+        {tab !== 'home' && (
+          <TabIntro key={tab} id={tab} dk={dk} cardStyle={cardStyle} textMain={textMain} textMuted={textMuted} />
+        )}
 
         {/* HOME TAB */}
         {tab === 'home' && (
@@ -1588,7 +1704,8 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 {/* Add Arc network button */}
                 <button
                   onClick={() => {
-                    void (window as Window & { ethereum?: { request: (args: {method: string; params: unknown[]}) => Promise<unknown> } }).ethereum?.request({
+                    const eth = (window as unknown as { ethereum?: { request: (args: { method: string; params: unknown[] }) => Promise<unknown> } }).ethereum
+                    void eth?.request({
                       method: 'wallet_addEthereumChain',
                       params: [{ chainId: '0x13b2', chainName: 'Arc', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: ['https://rpc.mainnet.arc.io'], blockExplorerUrls: ['https://explorer.arc.io'] }]
                     })

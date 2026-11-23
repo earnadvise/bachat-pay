@@ -63,7 +63,7 @@ export function UnifiedBalance({ contractAddress }: UnifiedBalanceProps) {
   const [spending, setSpending] = useState(false)
   const [spendTx, setSpendTx] = useState<string | null>(null)
 
-  const getAdapter = async (chainId: number) => {
+  const getAdapter = async (_chainId: number) => {
     if (!connectorClient) throw new Error('Wallet not connected')
     const provider = (connectorClient.transport as unknown as { request: EIP1193Provider['request'] })
     return await createViemAdapterFromProvider({ provider: provider as EIP1193Provider })
