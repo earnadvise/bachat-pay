@@ -238,6 +238,38 @@ function TabIntro({ id, dk, cardStyle, textMain, textMuted }: {
   )
 }
 
+// ── Open BachatPay inside a wallet app's own browser (most reliable on phones) ─
+function OpenInWallet({ dk, textMain, textMuted }: { dk: boolean; textMain: string; textMuted: string }) {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  const hasInjected = !!(window as unknown as { ethereum?: unknown }).ethereum
+  // Already inside a wallet browser, or on desktop: nothing to show
+  if (!isMobile || hasInjected) return null
+
+  const enc = encodeURIComponent(window.location.origin)
+  const links = [
+    { name: 'MetaMask', emoji: '🦊', href: `https://link.metamask.io/dapp/${window.location.host}` },
+    { name: 'Trust Wallet', emoji: '🛡️', href: `https://link.trustwallet.com/open_url?url=${enc}` },
+    { name: 'Coinbase Wallet', emoji: '🔵', href: `https://go.cb-w.com/dapp?cb_url=${enc}` },
+  ]
+
+  return (
+    <div className="mb-3 rounded-xl p-3 text-left" style={{ background: dk ? 'rgba(255,255,255,0.06)' : 'rgba(59,130,246,0.06)', border: `1px solid ${dk ? 'rgba(255,255,255,0.1)' : 'rgba(59,130,246,0.15)'}` }}>
+      <p className="text-xs font-bold mb-0.5" style={{ color: textMain }}>Wallet not opening? Open BachatPay inside your wallet app</p>
+      <p className="text-xs mb-2" style={{ color: textMuted }}>Tap your wallet. The app opens BachatPay in its own browser, then tap Connect Wallet there.</p>
+      <div className="grid grid-cols-3 gap-2">
+        {links.map(l => (
+          <a key={l.name} href={l.href} rel="noopener noreferrer"
+            className="flex flex-col items-center gap-1 rounded-lg py-2 text-center"
+            style={{ background: dk ? 'rgba(255,255,255,0.08)' : 'white', border: `1px solid ${dk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}` }}>
+            <span className="text-lg leading-none">{l.emoji}</span>
+            <span className="text-xs font-semibold" style={{ color: textMain }}>{l.name}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Root component — routes between landing and app ───────────────────────────
 export default function App() {
   const [showLanding, setShowLanding] = useState(() => {
@@ -1015,6 +1047,7 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
                 >
                   <Zap size={16} /> Connect Wallet (WalletConnect)
                 </button>
+                <OpenInWallet dk={dk} textMain={textMain} textMuted={textMuted} />
                 <p className="text-xs text-center" style={{ color:textMuted }}>Supports MetaMask, Trust, Rainbow, Coinbase, Rabby & 400+ wallets</p>
               </div>
             )}
