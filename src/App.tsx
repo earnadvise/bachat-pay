@@ -467,27 +467,42 @@ function AppMain({ onGoBack }: { onGoBack: () => void }) {
       try {
         // Fetch USDC token transfers
         const [transferRes, txRes] = await Promise.all([
-          fetch(`${ARC_EXPLORER_API}/addresses/${address}/token-transfers?token=${USDC_ADDRESS}&limit=50&_t=${Date.now()}`, { signal: ctrl.signal, cache: 'no-store' }),
-          fetch(`${ARC_EXPLORER_API}/addresses/${address}/transactions?limit=50&_t=${Date.now()}`, { signal: ctrl.signal, cache: 'no-store' }),
+          // The explorer rejects unknown query params (limit, _t), so send only supported ones
+          fetch(`${ARC_EXPLORER_API}/addresses/${address}/token-transfers?token=${USDC_ADDRESS}`, { signal: ctrl.signal, cache: 'no-store' }),
+          fetch(`${ARC_EXPLORER_API}/addresses/${address}/transactions`, { signal: ctrl.signal, cache: 'no-store' }),
         ])
         const seen = new Set<string>()
         const items: HistoryEntry[] = []
 
         if (transferRes.ok) {
-          const data = await transferRes.json() as { items?: Array<{ transaction_hash: string; from: { hash: string }; to: { hash: string }; total: { value: string; decimals: string }; timestamp: string }> }
-          for (const tx of (data.items ?? [])) {
-            if (seen.has(tx.transaction_hash)) continue
-            seen.add(tx.transaction_hash)
-            const isOut = tx.from.hash.toLowerCase() === address.toLowerCase()
-            const counterparty = isOut ? tx.to.hash : tx.from.hash
-            const label = KNOWN[counterparty.toLowerCase()]
+          const data = await transferRes.json() as { items?: Array<{ transaction_hash: string; from: { hash: string }; to: { hash: string }; total: { value: string; decimals: string } | null; timestamp: string }> }
+          // One transaction can hold several transfers (for example a vault payout plus a fee),
+          // so add them up per transaction instead of keeping only the first one.
+          const me = address.toLowerCase()
+          const byTx = new Map<string, { net: number; ts: number; cp: string; cpSize: number; label?: string }>()
+          for (const t of (data.items ?? [])) {
+            if (!t.total) continue
+            const amt = parseInt(t.total.value) / 10 ** parseInt(t.total.decimals)
+            if (!Number.isFinite(amt)) continue
+            const isOut = t.from.hash.toLowerCase() === me
+            const isIn = t.to.hash.toLowerCase() === me
+            if (!isOut && !isIn) continue
+            const counterparty = isOut ? t.to.hash : t.from.hash
+            const cur = byTx.get(t.transaction_hash) ?? { net: 0, ts: new Date(t.timestamp).getTime(), cp: counterparty, cpSize: -1 }
+            cur.net += isOut ? -amt : amt
+            if (amt > cur.cpSize) { cur.cp = counterparty; cur.cpSize = amt }
+            cur.label = cur.label ?? KNOWN[counterparty.toLowerCase()]
+            byTx.set(t.transaction_hash, cur)
+          }
+          for (const [hash, v] of byTx) {
+            seen.add(hash)
             items.push({
-              hash: tx.transaction_hash,
-              to: counterparty,
-              amount: (parseInt(tx.total.value) / 10 ** parseInt(tx.total.decimals)).toFixed(2),
-              note: label ?? 'USDC transfer',
-              ts: new Date(tx.timestamp).getTime(),
-              dir: isOut ? 'out' : 'in',
+              hash,
+              to: v.cp,
+              amount: Math.abs(v.net).toFixed(2),
+              note: v.label ?? 'USDC transfer',
+              ts: v.ts,
+              dir: v.net < 0 ? 'out' : 'in',
             })
           }
         }
