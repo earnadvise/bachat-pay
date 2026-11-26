@@ -18,7 +18,9 @@ const WC_PROJECT_ID = import.meta.env.VITE_WC_PROJECT_ID as string | undefined ?
 export const config = createConfig({
   chains: [arc, mainnet],
   connectors: [
-    injected({ shimDisconnect: true }),
+    // Wait up to 1.5s for extensions that inject their wallet late after a refresh,
+    // so the saved connection can be restored instead of showing "disconnected"
+    injected({ shimDisconnect: true, unstable_shimAsyncInject: 1500 }),
     walletConnect({
       projectId: WC_PROJECT_ID,
       showQrModal: false,

@@ -10,8 +10,9 @@ import { ConnectKitButton, useModal } from 'connectkit'
 import {
   useAccount, useChainId, useSwitchChain,
   useReadContract, useWriteContract, useWaitForTransactionReceipt,
-  useConnectorClient, useConnect, useConnectors,
+  useConnectorClient, useConnect, useConnectors, useConfig,
 } from 'wagmi'
+import { getAccount, reconnect as reconnectWallet } from 'wagmi/actions'
 import { erc20Abi, parseUnits, formatUnits, isAddress } from 'viem'
 import { arc } from 'viem/chains'
 import { toast } from 'sonner'
@@ -272,6 +273,17 @@ function OpenInWallet({ dk, textMain, textMuted }: { dk: boolean; textMain: stri
 
 // ── Root component — routes between landing and app ───────────────────────────
 export default function App() {
+  const wagmiConfig = useConfig()
+
+  // Safety net: if the wallet was not restored after a refresh (some extensions
+  // announce themselves late), try once more. Respects an explicit disconnect.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (getAccount(wagmiConfig).status === 'disconnected') void reconnectWallet(wagmiConfig)
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [wagmiConfig])
+
   const [showLanding, setShowLanding] = useState(() => {
     // Payment links go straight to the pay screen
     if (new URLSearchParams(window.location.search).get('to')) return false
